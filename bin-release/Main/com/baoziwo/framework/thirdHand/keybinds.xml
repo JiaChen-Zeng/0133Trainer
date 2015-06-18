@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<!-- binds、bind、press、hold、down 和 up 的 callback 是按键匹配后的回调函数 -->
+<binds version="1.0" callback="${allMatched}" stateMachine="${stateMachine}">
+	<!-- tolerance、ctrl、shift 和 alt 可在每个子元素上设置 -->
+	<bind tolerance="${second}" ctrl="${values:false, true}" shift="${values:false, true}" alt="${values:false, true}">
+		<!-- press, hold, combo, down, up -->
+		<press key="${keyName}" callback="${matched}">
+			<trigger callback="${callback}" delay="${second}"/>
+		</press>
+		
+		<hold key="${keyName}" callback="${matched}" time="${second}">
+			<trigger callback="${callback}" phase="${values:during}" start="${second}" end="${second}" interval="${second}" delay="${second}"/>
+			<trigger callback="${callback}" phase="${values:start, end, all}" delay="${second}"/>
+		</hold>
+		
+		<combo callback="${allMatched}">
+			<!-- press, hold, down, up -->
+		</combo>
+	</bind>
+</binds>

@@ -1,0 +1,13 @@
+/* CSS file */
+@namespace s "library://ns.adobe.com/flex/spark";
+@namespace mx "library://ns.adobe.com/flex/mx";
+@namespace containers "com.baoziwo.flex.containers.*";
+
+containers|FoldContainer {
+	skinClass:			ClassReference("com.baoziwo.flex.skins.FoldContainerSkin");
+	backgroundColor:	#FFFFFF;
+	borderAlpha:		1.0;
+	borderColor:		#B7BABC;
+	borderVisible:		true;
+	borderWeight:		1;
+}

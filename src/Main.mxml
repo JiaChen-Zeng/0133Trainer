@@ -1,0 +1,261 @@
+<?xml version="1.0" encoding="utf-8"?>
+<local:MainBase xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx"
+				xmlns:aoi="http://www.aoi.moe/"
+				xmlns:local="*"
+				
+				title="0133训练机"
+				width="400"
+				height="360"
+				skinClass="skins.MainSkin"
+				showStatusBar="false"
+				applicationComplete="applicationCompleteHandler(event)">
+	
+	<fx:Style source="css/Main.css"/>
+	
+	<fx:Declarations>
+		<fx:String id="charset">shift_jis</fx:String>
+		
+		<s:ArrayList id="charsets">
+			<fx:String>shift_jis</fx:String>
+			<fx:String>gb18030</fx:String>
+			<fx:String>utf8</fx:String>
+		</s:ArrayList>
+		
+		<fx:Number id="OD">9</fx:Number>
+		<fx:Number id="HP">8</fx:Number>
+		
+		<fx:String id="addNoScratch">否</fx:String>
+		
+		<s:ArrayList id="saraTypes">
+			<fx:String>是</fx:String>
+			<fx:String>否</fx:String>
+		</s:ArrayList>
+		
+		<fx:String id="hitSoundType">有</fx:String>
+		
+		<s:ArrayList id="hitSoundTypes">
+			<fx:String>有</fx:String>
+			<fx:String>无</fx:String>
+		</s:ArrayList>
+		
+		<fx:uint id="volume">70</fx:uint>
+		
+	</fx:Declarations>
+	
+	<fx:Script aoi:section="controller">
+		<![CDATA[
+			import mx.events.FlexEvent;
+			
+			import moe.aoi.utils.FileUtil;
+			
+			import songs.bmses.BMS;
+			import songs.bmses.BMSPack;
+			import songs.osus.BMS2OSUConverter;
+			import songs.osus.Beatmap;
+			
+			public static var current:Main;
+			
+			[Bindable]
+			private var bmsDirStr:String;
+			[Bindable]
+			private var outputDirStr:String;
+			
+			private var file:File = new File();
+			private var files:Vector.<File> = new <File>[];
+			private var processingBMSPacks:Vector.<BMSPack> = new <BMSPack>[];
+			
+			//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
+			//  Application
+			//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
+			
+			protected function applicationCompleteHandler(event:FlexEvent):void
+			{
+				current = this;
+			}
+			
+			//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
+			//  Directory
+			//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
+			
+			protected function selectBMSBtn_clickHandler(event:MouseEvent):void
+			{
+				file.addEventListener(Event.SELECT, bmsDir_selectHandler);
+				file.browseForDirectory('选择 BMS 文件夹');
+			}
+			
+			protected function selectOutputBtn_clickHandler(event:MouseEvent):void
+			{
+				file.addEventListener(Event.SELECT, outputDir_selectHandler);
+				file.browseForDirectory('选择输出文件夹');
+			}
+			
+			protected function convertBtn_clickHandler(event:MouseEvent):void
+			{
+				convertALL();
+			}
+			
+			
+		]]>
+	</fx:Script>
+	
+	<fx:Script aoi:section="model">
+		<![CDATA[
+			
+			protected function bmsDir_selectHandler(event:Event):void
+			{
+				file.removeEventListener(Event.SELECT, arguments.callee);
+				
+				bmsDirStr = file.url;
+			}
+			
+			protected function outputDir_selectHandler(event:Event):void
+			{
+				file.removeEventListener(Event.SELECT, arguments.callee);
+				
+				outputDirStr = file.url;
+			}
+			
+			protected function convertALL():void
+			{
+				const bmsDir:File = new File(bmsDirStr);
+				// TODO: 异步。
+				FileUtil.walkDirectoryAsync(bmsDir, walkFunc, false);
+				
+				function walkFunc(file:File, dir:File):Boolean
+				{
+					trace("Main.walkFunc(file, dir) : ", file.name);
+					const extension:String = file.extension;
+					if (file.isDirectory === false && BMS.isBMS(file))
+					{
+						const bmsPack:BMSPack = new BMSPack();
+						bmsPack.addEventListener(Event.COMPLETE, bmsPack_completeHandler);
+						bmsPack.addEventListener(IOErrorEvent.IO_ERROR, bmsPack_IoErrorHandler);
+						processingBMSPacks.push(bmsPack);
+						bmsPack.load(dir, 'shift_jis');
+						
+						return true;
+					}
+					
+					return false;
+				}
+			}
+			
+			protected function bmsPack_completeHandler(event:Event):void
+			{
+				var bmsPack:BMSPack = event.target as BMSPack;
+				if (bmsPack.processingFiles.length !== 0)
+				{
+					return;
+				}
+				
+				var converter:BMS2OSUConverter = new BMS2OSUConverter(bmsPack);
+				var beatmap:Beatmap = converter.convert();
+				
+				var outputDir:File = new File(outputDirStr);
+				beatmap.saveAsync(outputDir);
+				trace('Complete: ' + beatmap.name + ' !');
+			}
+			
+			protected function bmsPack_IoErrorHandler(event:IOErrorEvent):void
+			{
+				
+			}
+			
+			/**
+			 * 修复 NumericStepper 在 value 为整数时以小数显示的问题。
+			 * 但是它虽然显示小数，也不会影响到 OSUPrinter，它打印出的还是整数。
+			 */
+			protected function stepper_formatFunc(value:Number):String
+			{
+				const intager:uint = uint(value);
+				return value == intager ?
+					intager.toString() :
+					value.toString();
+			}
+			
+			// TODO: 把选择编码UI补上。还有去BMS2OSUConverter里把+1K的判断搞下，再来这补UI。
+			// TODO: 异步处理 BMS，显示进度。还有自动搜寻 zip 里的 BMS。 
+		]]>
+	</fx:Script>
+	
+	<local:header>
+		
+	</local:header>
+	
+	<local:layout>
+		<s:VerticalLayout horizontalAlign="left"/>
+	</local:layout>
+	
+	<s:Form id="form" width="200" height="200" defaultButton="{submitButton}">
+		<s:FormItem label="BMS 文件夹：" width="100%" required="true">
+			<s:layout>
+				<s:HorizontalLayout/>
+			</s:layout>
+			<s:TextInput text="@{bmsDirStr}"/>
+			<s:Button label="选择"
+					  click="selectBMSBtn_clickHandler(event)"/>
+		</s:FormItem>
+		
+		<s:FormItem label="输出文件夹：" width="100%" required="true">
+			<s:layout>
+				<s:HorizontalLayout/>
+			</s:layout>
+			<s:TextInput text="@{outputDirStr}"/>
+			<s:Button label="选择"
+					  click="selectOutputBtn_clickHandler(event)"/>
+		</s:FormItem>
+		
+		<s:FormItem label="编码：" width="100%">
+			<s:ComboBox selectedItem="@{charset}"
+						dataProvider="{charsets}"/>
+		</s:FormItem>
+		
+		<s:FormItem label="OD：" width="100%">
+			<s:layout>
+				<s:HorizontalLayout verticalAlign="middle"/>
+			</s:layout>
+			<s:HSlider value="@{OD}" snapInterval="0.1" dataTipPrecision="1"/>
+			<s:NumericStepper value="@{OD}" snapInterval="0.1" stepSize="0.1" valueFormatFunction="stepper_formatFunc"/>
+		</s:FormItem>
+		
+		<s:FormItem label="HP：" width="100%">
+			<s:layout>
+				<s:HorizontalLayout verticalAlign="middle"/>
+			</s:layout>
+			<s:HSlider value="@{HP}" snapInterval="0.1" dataTipPrecision="1"/>
+			<s:NumericStepper value="@{HP}" snapInterval="0.1" stepSize="0.1" valueFormatFunction="stepper_formatFunc"/>
+		</s:FormItem>
+		
+		<s:FormItem label="是否附加7k无皿谱：" width="100%">
+			<s:DropDownList selectedItem="@{addNoScratch}"
+							dataProvider="{saraTypes}"/>
+		</s:FormItem>
+		
+		<s:FormItem label="默认击打音效：" width="100%">
+			<s:DropDownList selectedItem="@{hitSoundType}"
+							dataProvider="{hitSoundTypes}"/>
+		</s:FormItem>
+		
+		<s:FormItem label="默认击打音效音量：" width="100%">
+			<s:NumericStepper minimum="0" maximum="100" value="@{volume}"/>
+		</s:FormItem>
+		
+		<s:Button id="submitButton" label="转换" click="convertBtn_clickHandler(event)"/>
+	</s:Form>
+	
+	<local:footer>
+		
+	</local:footer>
+	
+	<local:leftSide>
+		
+	</local:leftSide>
+	
+	<local:rightSide>
+		
+	</local:rightSide>
+	
+</local:MainBase>
+
