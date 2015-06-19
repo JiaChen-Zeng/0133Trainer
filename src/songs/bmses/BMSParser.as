@@ -12,11 +12,11 @@ package songs.bmses
 		//
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		
-		private static const RE_HEADER:RegExp = /^#((?!(?:WAV|BMP|BPM|wav|bmp|bpm)(?:\w{2}))\w+)[ \t]+(.*)$/;
+		private static const RE_HEADER:RegExp = /^#((?!(?:WAV|BMP|BPM|STOP)(?:\w{2}))\w+)[ \t]+(.*)$/i;
 		
-		private static const RE_ID:RegExp = /^#(WAV|BMP|BPM|wav|bmp|bpm)(\w{2})\s+(.+)$/;
+		private static const RE_ID:RegExp = /^#(WAV|BMP|BPM|STOP)(\w{2})\s+(.+)$/i;
 		
-		private static const RE_MAIN_DATA:RegExp = /^#(\d{3})(\d{2}):([\w.]+)$/;
+		private static const RE_MAIN_DATA:RegExp = /^#(\d{3})(\d{2}):([\w.]+)$/i;
 		
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		//
@@ -72,6 +72,13 @@ package songs.bmses
 				// 按属性的类型来赋值。
 				const attr:String = key.toLowerCase();
 				
+				if (attr == 'difficalty') // 辣鸡谱师连英文都会拼错，葵真是服了！
+				{
+					bms.difficulty = parseInt(value);
+					trace('this[' + key.toLowerCase()+ '] = ' + value + ';');
+					return;
+				}
+				
 				trace(typeof bms[attr]);
 				
 				if (bms[attr] is uint
@@ -81,12 +88,10 @@ package songs.bmses
 					bms[attr] = parseFloat(value);
 				else
 				{
-					if (attr === 'stagefile'
-					||  attr === 'banner'
-					||  attr === 'backbmp')
-					{
+					if (attr == 'stagefile'
+					||  attr == 'banner'
+					||  attr == 'backbmp')
 						bms[attr] = fixBmp(value);
-					}
 					else
 						bms[attr] = value;
 				}
@@ -110,6 +115,12 @@ package songs.bmses
 			bms[type.toLowerCase() + 's'][parseInt(key, 36)] = value;
 		}
 		
+		/**
+		 * 重构，解除顺序问题对 data 的影响？
+		 * converter.convertMainData()？ 里也来按照特定的通道顺序来转换，避免冲突和复杂的逻辑判断。
+		 * 可能得事先排好顺序。
+		 * PS：写这段话的时候葵并没有看相关代码，全凭细微的记忆和爆发的脑洞，不负任何责任。
+		 */
 		private function parseMainData(measureIndexStr:String, channelStr:String, content:String):void
 		{
 			const measureIndex:uint = parseInt(measureIndexStr);
@@ -143,7 +154,8 @@ package songs.bmses
 				data.measureIndex = measureIndex;
 				data.channel = channel;
 				
-				if (channel === BMS.CHANNEL_BPM) // BPM 通道是16进制。
+				if (channel == BMS.CHANNEL_BPM
+				||  channel == BMS.CHANNEL_STOP) // BPM 和 STOP 通道是16进制。
 					data.content = parseInt(contentStr, 16);
 				else
 					data.content = parseInt(contentStr, 36);

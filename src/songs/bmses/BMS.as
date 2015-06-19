@@ -8,6 +8,7 @@ package songs.bmses
 	 * http://blog.csdn.net/teajs/article/details/20698733
 	 * http://fileformats.wikia.com/wiki/Be-Music_Script
 	 * http://bbs.sjtu.edu.cn/bbstcon,board,MusicGame,reid,1277457310.html
+	 * http://hitkey.nekokan.dyndns.info/cmds.htm
 	 */
 	public final class BMS implements IBMS
 	{
@@ -18,12 +19,12 @@ package songs.bmses
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
-		//  Charsets
+		//  Encodings
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		
-		internal static const CHARSET_SHIFT_JIS:String = 'shift_jis';
+		internal static const ENCODING_SHIFT_JIS:String = 'shift_jis';
 		
-		internal static const CHARSET_UTF8:String = 'utf-8';
+		internal static const ENCODING_UTF8:String = 'utf-8';
 		
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		//  Channels
@@ -70,11 +71,15 @@ package songs.bmses
 		public static function isBMS(file:File):Boolean
 		{
 			var extension:String = file.extension;
-			return extension === 'bms'
-				|| extension === 'bme'
-				|| extension === 'bml'
-				|| extension === 'bmx'
-				|| extension === 'bns';
+			return extension == 'bms'
+				|| extension == 'bme'
+				|| extension == 'bml'
+				|| extension == 'bmx'
+				|| extension == 'bns'
+				|| extension == 'pms'
+				// 等等…… syk 这不是…… さやか 啊！哪有这样吃饱没事干的人？
+				|| extension == 'syk' // TODO: 还有什么奇葩格式？
+				|| extension == 'sm'; // 待测试
 		}
 		
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
@@ -152,6 +157,8 @@ package songs.bmses
 		
 		public var bpms:Array;
 		
+		public var stops:Array;
+		
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		//  Main Data
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
@@ -216,6 +223,7 @@ package songs.bmses
 			wavs = [];
 			bmps = [];
 			bpms = [];
+			stops = [];
 		}
 	}
 }

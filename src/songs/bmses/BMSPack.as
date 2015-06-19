@@ -1,7 +1,5 @@
 package songs.bmses
 {
-	import moe.aoi.utils.FileReferenceUtil;
-	
 	import flash.events.Event;
 	import flash.events.EventDispatcher;
 	import flash.events.FileListEvent;
@@ -9,6 +7,8 @@ package songs.bmses
 	import flash.filesystem.File;
 	
 	import mx.utils.StringUtil;
+	
+	import moe.aoi.utils.FileReferenceUtil;
 
 	//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 	//  Events
@@ -33,9 +33,9 @@ package songs.bmses
 		//
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		
-		public function BMSPack()
+		public function BMSPack(directory:File = null)
 		{
-			
+			_directory = directory;
 		}
 		
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
@@ -44,7 +44,6 @@ package songs.bmses
 		//
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		
-		private var encoding:String;
 		
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		//
@@ -82,18 +81,11 @@ package songs.bmses
 		//
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		
-		public function load(directory:File, encoding:String):void
+		/**
+		 * 加载文件夹内所有 BMS。
+		 */
+		public function load():void
 		{
-			_directory = directory;
-			
-			this.encoding = encoding;
-			
-			loadBMSes();
-		}
-		
-		private function loadBMSes():void
-		{
-			// TODO: 加载文件夹内所有 BMS。
 			_bmses 				= new <BMS>[];
 			_processingFiles	= new <File>[];
 			_completedFiles		= new <File>[];
@@ -129,7 +121,7 @@ package songs.bmses
 			// TODO: 选择转什么码，自动转码。
 			var bms:BMS = new BMS(this);
 			bms.name = FileReferenceUtil.getBaseName(file);
-			bms.setData(file.data, encoding);
+			bms.setData(file.data, Main.current.encoding);
 			bms.load();
 			_bmses.push(bms);
 //			trace('loadComplete');

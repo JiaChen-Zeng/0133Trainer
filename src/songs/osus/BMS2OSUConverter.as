@@ -60,6 +60,8 @@ package songs.osus
 		
 		private static const MINUTE:uint = 60000;
 		
+		private static const MAX_DIVISION:uint = 192;
+		
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		//
 		//  Class methods
@@ -336,6 +338,7 @@ package songs.osus
 					break;
 				
 				case BMS.CHANNEL_STOP: // 暂停
+					convertStop(data);
 					// TODO: BPM：1。
 					break;
 				
@@ -700,6 +703,16 @@ package songs.osus
 			trace('第 ' + lane + ' 道，offset: ' + offset);
 		}
 		
+		/**
+		 * 
+		 * 公式：(60（一分钟秒数） / 60（BPM）)（每拍时间）* 4 （节拍） * 48（STOP值） / 192（最大节拍细分）
+		 * MUNITE / bpm * meter * 4 * stop / MAX_DIVISION * 1000
+		 */
+		private function convertStop(data:Data):void
+		{
+			MAX_DIVISION
+		}
+		
 		private function getPlayer(channel:uint):uint
 		{
 			// 先判断是玩家几。
@@ -727,6 +740,15 @@ package songs.osus
 		//  Others
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		
+		/**
+		 * 后注：这个函数好像是在 BPM 通道不出现在最开头的时候用的，
+		 * 避免 data 没有 lastBPM？ 来参照的问题。
+		 * 解决方案：在最开头加上一个 BPM data，先转。
+		 * 
+		 * 后来发现如果 BPM data 也在开头的话，不会加，
+		 * 但是这时候在它之前还有 data，转换的时候没有 lastBPM？ 参照报错，
+		 * 所以 .isFirstTimingPointData() 判断如果有的话，直接先加上！（即不管它在不在开头，第一个转它(BPM)）
+		 */
 		private function addFirstTimingPointRedDataIfEmpty():void
 		{
 			// 寻找第一个 BPM 数据。
@@ -741,9 +763,15 @@ package songs.osus
 				{
 					if (data.channel === BMS.CHANNEL_BPM)
 					{
-						// 如果有了就不用加了。
+						// 如果有了就不用加了。<---错！详细看文档注释。
+						// 直接加！
 						if (isFirstTimingPointData(data))
+						{
+							convertBPM(data);
+							// 加完当然要把它从里面删去，不然会加了2个在开头的相同的 tp。
+							measure.splice(measure.indexOf(data), 1); 
 							return;
+						}
 						
 						// 没有就加。
 						bpmData = data;
@@ -776,7 +804,11 @@ package songs.osus
 		 */
 		private function isFirstTimingPointData(data:Data):Boolean
 		{
-			return data.channel === BMS.CHANNEL_BPM && data.measureIndex === 0 &&  data.content !== 0;
+			return data.channel == BMS.CHANNEL_BPM
+				&& data.measureIndex == 0
+				&& data.index == 0 // 这一行为了解决在第一小节非索引0出现 bpm，不加红线的问题。
+				// 然而实际上并没有遇到这个问题，可能是运气好，算是误打误撞发现了个隐藏 bug，需测试稳定！
+				&& data.content !== 0;
 		}
 		
 		/**
