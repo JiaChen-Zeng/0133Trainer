@@ -134,8 +134,15 @@ package songs.osus
 		
 		/**
 		 * 必须用 Number，这个是原始的 offset 数值，没有 Math.round() 过的。
+		 * 解决小数被舍去的问题。
 		 */
 		private var lastTimingPoint_offset:Number;
+		
+		/**
+		 * 必须用 Number，这个是原始的 offset 数值，没有 Math.round() 过的。
+		 * 为了调整有 stop 的 meter 小节的 offset，需要精确的数值。
+		 */
+		private var thisMeterEndTimingPoint_offset:Number;
 		
 		/**
 		 * 记录最后的 tp 位置，类似于 measureIndex + index / length。
@@ -341,7 +348,7 @@ package songs.osus
 					break;
 				
 				case BMS.CHANNEL_STOP: // 暂停
-//					convertStop(data);
+					convertStop(data);
 					// TODO: 
 					break;
 				
@@ -573,30 +580,43 @@ package songs.osus
 			
 			// 缓存终止 TP。这时候参照的 offset 是上面的那个哟。
 			const endTp:TimingPoint = new TimingPoint();
-			endTp.offset = Math.round(getMeasureTime(lastBPMData, thisMeterData) + offset);
+			const endTp_offset:Number = getMeasureTime(lastBPMData, thisMeterData) + offset;
+			endTp.offset = Math.round(endTp_offset);
 			endTp.time = MINUTE / lastBPMData.content;
 			endTp.type = TimingPoint.TYPE_TIMING;
 			
 			thisMeterEndTimingPoint = endTp;
+			thisMeterEndTimingPoint_offset = endTp_offset;
 		}
 		
 		/**
 		 * 使之后的整个谱面数据暂停（延后）一段时间。
 		 * 不受 meter 的影响，都是 *4！
-		 * 延后的时间公式：(60（一分钟毫秒数） / 60（BPM）)（每拍时间）* 4（拍） * 48（STOP值） / 192（最大节拍细分） == 1
-		 * MINUTE / bpm * 4 * stop / MAX_DIVISION
 		 */
 		private function convertStop(data:Data):void
 		{
+			// 加一个起始 tp 停止开始。
 			const tp:TimingPoint = new TimingPoint();
 			const offset:Number = getOffset3(data);
 			tp.offset = Math.round(offset);
-			tp.time = MINUTE / lastBPMData.content;
+			tp.time = STOP_TIME;
 			tp.type = TimingPoint.TYPE_TIMING;
 			
+			// 加一个结束 tp 停止结束。
 			const endTp:TimingPoint = new TimingPoint();
-			tp.offset = Math.round(offset + MINUTE / lastBPMData.content * 4 * data.content / MAX_DIVISION);
-//			tp.time = 
+			const stopTime:Number = getStopTime(data);
+			endTp.offset = Math.round(offset + stopTime);
+			endTp.time = MINUTE / lastBPMData.content;
+			endTp.type = TimingPoint.TYPE_TIMING;
+			
+			lastTimingPoint_offset = offset + stopTime;
+			lastTimingPoint_position = data.measureIndex + data.index / data.length;
+			osu.timingPoints.push(tp, endTp);
+			
+			// 重新调整（延后） meter 结束 tp 的 offset。
+			if (thisMeterEndTimingPoint)
+				thisMeterEndTimingPoint.offset = 
+					thisMeterEndTimingPoint_offset = thisMeterEndTimingPoint_offset + stopTime; 
 		}
 		
 		private function convertBGM(data:Data):void
@@ -980,6 +1000,14 @@ package songs.osus
 			// 四暗刻到除数为0的情况。
 			// TODO: BMS拍数判断。换掉这个4 →→→↓
 			return Math.round(60000 / osu.bpm * 4 * (measureIndex + (index === 0 ? 0 : index * 1 / length)));
+		}
+		/**
+		 * 延后的时间公式：(600000（一分钟毫秒数） / 60（BPM）)（每拍时间）* 4（拍） * 48（STOP值） / 192（最大节拍细分） == 1
+		 * MINUTE / bpm * 4 * stop / MAX_DIVISION
+		 */
+		private function getStopTime(data:Data):Number
+		{
+			return MINUTE / lastBPMData.content * 4 * data.content / MAX_DIVISION;
 		}
 	}
 }

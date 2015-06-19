@@ -17,7 +17,7 @@ package songs.bmses
 		 * 只包含几个比较重要的，对 offset 有影响的 channel，其他的就按 channel 的值来排序吧。
 		 **/
 		private static const CHANNEL_ORDER_MAP:Object =
-		{
+		{ // 日狗，做了半天发觉没错就是按通道直接解析下来的顺序！
 			9: 0, // BMS.CHANNEL_STOP
 			2: 1, // BMS.CHANNEL_METER
 			3: 2, // BMS.CHANNEL_BPM
@@ -220,27 +220,28 @@ package songs.bmses
 							var in1:Boolean = data1.channel in CHANNEL_ORDER_MAP;
 							var in2:Boolean = data2.channel in CHANNEL_ORDER_MAP;
 							
-							if (in1 && !in2) // 前面的需特定排序，后面不需，不交换。
+							if (!in1 && !in2) // 不需要特定排序，按通道从小到大排列。
 							{
-								
+								if (data1.channel > data2.channel)
+								{
+									measure[i] = data2;
+									measure[j] = data1;
+								}
 							}
 							else if (!in1 && in2) // 前面的不需特定排序，后面需，交换。
 							{
 								measure[i] = data2;
 								measure[j] = data1;
 							}
-							else if (in1 && in2) // 都需特定排序，按照特定排序排列。
+							else if (in1 && !in2) // 前面的需特定排序，后面不需，不交换。
+							{
+								
+							}
+							else // 都需特定排序，按照特定排序排列。
 							{
 								if (CHANNEL_ORDER_MAP[data1.channel] > CHANNEL_ORDER_MAP[data2.channel])
 								{
-									measure[i] = data2;
-									measure[j] = data1;
-								}
-							}
-							else // 不需要特定排序，按通道从小到大排列。
-							{
-								if (data1.channel > data2.channel)
-								{
+									trace('特定排序');
 									measure[i] = data2;
 									measure[j] = data1;
 								}

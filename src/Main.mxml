@@ -107,14 +107,14 @@
 			{
 				file.removeEventListener(Event.SELECT, arguments.callee);
 				
-				bmsDirStr = file.url;
+				bmsDirStr = decodeURIComponent(file.url);
 			}
 			
 			protected function outputDir_selectHandler(event:Event):void
 			{
 				file.removeEventListener(Event.SELECT, arguments.callee);
 				
-				outputDirStr = file.url;
+				outputDirStr = decodeURIComponent(file.url);
 			}
 			
 			protected function collectAll():void
@@ -246,7 +246,7 @@
 			<s:NumericStepper minimum="0" maximum="100" value="@{volume}"/>
 		</s:FormItem>
 		
-		<s:Button id="submitButton" label="转换" click="convertBtn_clickHandler(event)"/>
+		<s:Button id="submitButton" label="训练" click="convertBtn_clickHandler(event)"/>
 	</s:Form>
 	
 	<local:footer>
