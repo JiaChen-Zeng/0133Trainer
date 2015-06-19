@@ -59,6 +59,10 @@ package songs.osus
 		
 		/**
 		 * 每小节节拍数。
+		 * 好像只有在 OSU Editor 里起到分小节的作用。
+		 * 呃不对，那在玩的时候小节线也会变的呀。
+		 * 可能 end time 里小节线没有对齐就是因为这个没有设置。
+		 * TODO: 貌似葵转换的时候都没有设置它，其他做好要设置一下。
 		 */
 		internal var meter:uint = 4;
 		

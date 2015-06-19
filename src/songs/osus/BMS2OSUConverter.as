@@ -62,6 +62,9 @@ package songs.osus
 		
 		private static const MAX_DIVISION:uint = 192;
 		
+		/** 从 Sakuzyo - Altale (__M A S__) [7K MX] 里找到的 time 数值，感谢神麻婆 mas！ **/
+		private static const STOP_TIME:Number = 999999999.666667;
+		
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		//
 		//  Class methods
@@ -338,8 +341,8 @@ package songs.osus
 					break;
 				
 				case BMS.CHANNEL_STOP: // 暂停
-					convertStop(data);
-					// TODO: BPM：1。
+//					convertStop(data);
+					// TODO: 
 					break;
 				
 				// 11 - 17：1P的弹奏通道（WAV）
@@ -577,6 +580,25 @@ package songs.osus
 			thisMeterEndTimingPoint = endTp;
 		}
 		
+		/**
+		 * 使之后的整个谱面数据暂停（延后）一段时间。
+		 * 不受 meter 的影响，都是 *4！
+		 * 延后的时间公式：(60（一分钟毫秒数） / 60（BPM）)（每拍时间）* 4（拍） * 48（STOP值） / 192（最大节拍细分） == 1
+		 * MINUTE / bpm * 4 * stop / MAX_DIVISION
+		 */
+		private function convertStop(data:Data):void
+		{
+			const tp:TimingPoint = new TimingPoint();
+			const offset:Number = getOffset3(data);
+			tp.offset = Math.round(offset);
+			tp.time = MINUTE / lastBPMData.content;
+			tp.type = TimingPoint.TYPE_TIMING;
+			
+			const endTp:TimingPoint = new TimingPoint();
+			tp.offset = Math.round(offset + MINUTE / lastBPMData.content * 4 * data.content / MAX_DIVISION);
+//			tp.time = 
+		}
+		
 		private function convertBGM(data:Data):void
 		{
 			const sound:Sound = new Sound();
@@ -587,6 +609,19 @@ package songs.osus
 				sound.file = PREFIX_SOUND_FILE + matchPath(path);
 			
 			osu.sounds.push(sound);
+		}
+		
+		private function getPlayer(channel:uint):uint
+		{
+			// 先判断是玩家几。
+			if ((10 < channel && channel < 20)
+				||  (50 < channel && channel < 60))
+				return 0;
+			else if ((20 < channel && channel < 30)
+				||  (60 < channel && channel < 70))
+				return 1;
+			else
+				throw new Error('无法把bms轨道转换为对应的osu轨道，channel: ' + channel);
 		}
 		
 		private function convertBGA(data:Data):void
@@ -701,29 +736,6 @@ package songs.osus
 				haveScratch = true;
 			
 			trace('第 ' + lane + ' 道，offset: ' + offset);
-		}
-		
-		/**
-		 * 
-		 * 公式：(60（一分钟秒数） / 60（BPM）)（每拍时间）* 4 （节拍） * 48（STOP值） / 192（最大节拍细分）
-		 * MUNITE / bpm * meter * 4 * stop / MAX_DIVISION * 1000
-		 */
-		private function convertStop(data:Data):void
-		{
-			MAX_DIVISION
-		}
-		
-		private function getPlayer(channel:uint):uint
-		{
-			// 先判断是玩家几。
-			if ((10 < channel && channel < 20)
-				||  (50 < channel && channel < 60))
-				return 0;
-			else if ((20 < channel && channel < 30)
-				||  (60 < channel && channel < 70))
-				return 1;
-			else
-				throw new Error('无法把bms轨道转换为对应的osu轨道，channel: ' + channel);
 		}
 		
 		private function setSound(hitObject:HitObject, content:uint):void
