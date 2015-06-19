@@ -12,6 +12,18 @@ package songs.bmses
 		//
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		
+		/**
+		 * 映射出 channel 的排列顺序，以便转换。
+		 * 只包含几个比较重要的，对 offset 有影响的 channel，其他的就按 channel 的值来排序吧。
+		 **/
+		private static const CHANNEL_ORDER_MAP:Object =
+		{
+			9: 0, // BMS.CHANNEL_STOP
+			2: 1, // BMS.CHANNEL_METER
+			3: 2, // BMS.CHANNEL_BPM
+			8: 3 // BMS.CHANNEL_BPM_EXTENDED
+		};
+		
 		private static const RE_HEADER:RegExp = /^#((?!(?:WAV|BMP|BPM|STOP)(?:\w{2}))\w+)[ \t]+(.*)$/i;
 		
 		private static const RE_ID:RegExp = /^#(WAV|BMP|BPM|STOP)(\w{2})\s+(.+)$/i;
@@ -79,7 +91,7 @@ package songs.bmses
 					return;
 				}
 				
-				trace(typeof bms[attr]);
+//				trace(typeof bms[attr]);
 				
 				if (bms[attr] is uint
 					||  bms[attr] is int)
@@ -115,12 +127,6 @@ package songs.bmses
 			bms[type.toLowerCase() + 's'][parseInt(key, 36)] = value;
 		}
 		
-		/**
-		 * 重构，解除顺序问题对 data 的影响？
-		 * converter.convertMainData()？ 里也来按照特定的通道顺序来转换，避免冲突和复杂的逻辑判断。
-		 * 可能得事先排好顺序。
-		 * PS：写这段话的时候葵并没有看相关代码，全凭细微的记忆和爆发的脑洞，不负任何责任。
-		 */
 		private function parseMainData(measureIndexStr:String, channelStr:String, content:String):void
 		{
 			const measureIndex:uint = parseInt(measureIndexStr);
@@ -180,11 +186,19 @@ package songs.bmses
 			measures[measureIndex].push(data);
 		}
 		
+		/**
+		 * 重构，解除顺序问题对 data 的影响？
+		 * converter.convertMainData()？ 里也来按照特定的通道顺序来转换，避免冲突和复杂的逻辑判断。
+		 * 可能得事先排好顺序。
+		 * PS：写这段话的时候葵并没有看相关代码，全凭细微的记忆和爆发的脑洞，不负任何责任。
+		 */
 		private function sortMainData():void
 		{
+			// 选取每个小节。
 			for each (var measure:Vector.<Data> in bms.measures) 
 			{
 				var measure_length:uint = measure.length;
+				// 选取小节内的每2个数据，冒泡排序。
 				for (var i:int = 0; i < measure_length; i++) 
 				{
 					for (var j:int = i + 1; j < measure_length; j++) 
@@ -194,11 +208,43 @@ package songs.bmses
 						
 						var time1:Number = data1.index / data1.length;
 						var time2:Number = data2.index / data2.length;
-						if (time1 > time2
-						|| (time1 === time2 && data1.channel > data2.channel))
+						
+						// 满足条件就交换顺序。
+						if (time1 > time2) // 按从时间小到大排列。
 						{
 							measure[i] = data2;
 							measure[j] = data1;
+						}
+						else if (time1 === time2) // 时间相同，按通道排序。
+						{
+							var in1:Boolean = data1.channel in CHANNEL_ORDER_MAP;
+							var in2:Boolean = data2.channel in CHANNEL_ORDER_MAP;
+							
+							if (in1 && !in2) // 前面的需特定排序，后面不需，不交换。
+							{
+								
+							}
+							else if (!in1 && in2) // 前面的不需特定排序，后面需，交换。
+							{
+								measure[i] = data2;
+								measure[j] = data1;
+							}
+							else if (in1 && in2) // 都需特定排序，按照特定排序排列。
+							{
+								if (CHANNEL_ORDER_MAP[data1.channel] > CHANNEL_ORDER_MAP[data2.channel])
+								{
+									measure[i] = data2;
+									measure[j] = data1;
+								}
+							}
+							else // 不需要特定排序，按通道从小到大排列。
+							{
+								if (data1.channel > data2.channel)
+								{
+									measure[i] = data2;
+									measure[j] = data1;
+								}
+							}
 						}
 					}
 				}
@@ -208,7 +254,6 @@ package songs.bmses
 		/**
 		 * 艹，怎么会BMS文件里的WAV文件后缀名是wav，实际上是ogg啊，搞不明白了。
 		 * 日，bmp是png。
-		 * REALLY TIRED OF THIS!
 		 */
 		private function fixWav(fileName:String):String
 		{
