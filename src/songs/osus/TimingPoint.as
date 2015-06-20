@@ -1,7 +1,11 @@
 package songs.osus
 {
 	import mx.utils.StringUtil;
-
+	
+	/**
+	 * osu 的 TimingPoint。
+	 * @see songs.osus.osu
+	 */
 	public class TimingPoint
 	{
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆

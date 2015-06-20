@@ -17,6 +17,9 @@ package songs.bmses
 	[Event(name="complete", type="flash.events.Event")]
 	[Event(name="ioError", type="flash.events.IOErrorEvent")]
 	
+	/**
+	 * 装着 bms 的文件夹用这个类表示。
+	 */
 	public final class BMSPack extends EventDispatcher implements IBMS
 	{
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
@@ -25,6 +28,7 @@ package songs.bmses
 		//
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		
+		/** 这个好像是匹配出难度名？ */
 		public static const RE_VERSION:RegExp = /\(.+\)|\[.+\]|-.+-$/;
 		
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆

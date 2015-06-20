@@ -48,8 +48,6 @@
 		<![CDATA[
 			import mx.events.FlexEvent;
 			
-			import moe.aoi.utils.FileUtil;
-			
 			import songs.bmses.BMS;
 			import songs.bmses.BMSPack;
 			import songs.osus.BMS2OSUConverter;
@@ -117,12 +115,17 @@
 				outputDirStr = decodeURIComponent(file.url);
 			}
 			
+			/**
+			 * 异步收集所有内含 BMS 的文件夹，一检测到（它里面含有 BMS）就返回，
+			 * 创建对应的 BMSPack，最后收集完毕调用 loadAll()。
+			 * @see #loadAll()
+			 * @see #walkDirectoryAsync()
+			 */
 			protected function collectAll():void
 			{
 				processingBMSPacks = new <BMSPack>[];
 				const bmsDir:File = new File(bmsDirStr);
-				// TODO: 异步。
-				FileUtil.walkDirectoryAsync(bmsDir, walkFunc, convertAll, false);
+				walkDirectoryAsync(bmsDir, walkFunc, loadAll, false);
 				
 				function walkFunc(file:File, dir:File):Boolean
 				{
@@ -138,7 +141,12 @@
 				}
 			}
 			
-			protected function convertAll():void
+			/**
+			 * 所有搜集到的 bmsPack。
+			 * @see #collectAll()
+			 * @see #bmsPack_completeHandler()
+			 */
+			protected function loadAll():void
 			{
 				for each (var bmsPack:BMSPack in processingBMSPacks) 
 				{
@@ -148,6 +156,10 @@
 				}
 			}
 			
+			/**
+			 * 转换 BMSPack。
+			 * @see #loadAll()
+			 */
 			protected function bmsPack_completeHandler(event:Event):void
 			{
 				var bmsPack:BMSPack = event.target as BMSPack;
@@ -177,6 +189,49 @@
 				return value == intager ?
 					intager.toString() :
 					value.toString();
+			}
+			
+			/**
+			 * 异步遍历目录。文件和文件夹都会调用。
+			 * 把它放进来的原因是我的库可能会变，另外重点是这个函数真的能通用？
+			 * @param directory 要遍历的目录
+			 * @param walkFunc 遍历文件的函数 function(file:File[, dir:File]):void/Boolean（条件返回 true 则不在此 file 中继续遍历）
+			 * @param completeFunc 完成遍历后的函数 function():void
+			 * @param isRootOnly 是否只遍历根目录
+			 */
+			public static function walkDirectoryAsync(directory:File, walkFunc:Function,
+													  completeFunc:Function,
+													  isRootOnly:Boolean = false):void
+			{
+				const walkingDirs:Vector.<File> = new <File>[];
+				
+				directory.addEventListener(FileListEvent.DIRECTORY_LISTING, directory_listingHandler);
+				walkingDirs.push(directory);
+				directory.getDirectoryListingAsync();
+				
+				function directory_listingHandler(event:FileListEvent):void
+				{
+					const dir:File = event.currentTarget as File;
+					dir.removeEventListener(FileListEvent.DIRECTORY_LISTING, arguments.callee);
+					walkingDirs.splice(walkingDirs.indexOf(dir), 1);
+					
+					const files:Array = event.files;
+					for each (var file:File in files)
+					{
+						if (walkFunc(file, dir))
+							break;
+						
+						if (!isRootOnly && file.isDirectory)
+						{
+							file.addEventListener(FileListEvent.DIRECTORY_LISTING, arguments.callee);
+							walkingDirs.push(file);
+							file.getDirectoryListingAsync();
+						}
+					}
+					
+					if (walkingDirs.length == 0)
+						completeFunc();
+				}
 			}
 			
 			// TODO: 把选择编码UI补上。还有去BMS2OSUConverter里把+1K的判断搞下，再来这补UI。

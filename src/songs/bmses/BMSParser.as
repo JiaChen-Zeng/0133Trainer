@@ -12,18 +12,6 @@ package songs.bmses
 		//
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		
-		/**
-		 * 映射出 channel 的排列顺序，以便转换。
-		 * 只包含几个比较重要的，对 offset 有影响的 channel，其他的就按 channel 的值来排序吧。
-		 **/
-		private static const CHANNEL_ORDER_MAP:Object =
-		{ // 日狗，做了半天发觉没错就是按通道直接解析下来的顺序！
-			9: 0, // BMS.CHANNEL_STOP
-			2: 1, // BMS.CHANNEL_METER
-			3: 2, // BMS.CHANNEL_BPM
-			8: 3 // BMS.CHANNEL_BPM_EXTENDED
-		};
-		
 		private static const RE_HEADER:RegExp = /^#((?!(?:WAV|BMP|BPM|STOP)(?:\w{2}))\w+)[ \t]+(.*)$/i;
 		
 		private static const RE_ID:RegExp = /^#(WAV|BMP|BPM|STOP)(\w{2})\s+(.+)$/i;
@@ -160,8 +148,7 @@ package songs.bmses
 				data.measureIndex = measureIndex;
 				data.channel = channel;
 				
-				if (channel == BMS.CHANNEL_BPM
-				||  channel == BMS.CHANNEL_STOP) // BPM 和 STOP 通道是16进制。
+				if (channel == BMS.CHANNEL_BPM) // BPM 通道是16进制。
 					data.content = parseInt(contentStr, 16);
 				else
 					data.content = parseInt(contentStr, 36);
@@ -187,10 +174,8 @@ package songs.bmses
 		}
 		
 		/**
-		 * 重构，解除顺序问题对 data 的影响？
-		 * converter.convertMainData()？ 里也来按照特定的通道顺序来转换，避免冲突和复杂的逻辑判断。
-		 * 可能得事先排好顺序。
-		 * PS：写这段话的时候葵并没有看相关代码，全凭细微的记忆和爆发的脑洞，不负任何责任。
+		 * 使数据按照通道从小到大排列，另外 stop 通道放到最后。
+		 * @see BMS#CHANNEL_STOP
 		 */
 		private function sortMainData():void
 		{
@@ -215,36 +200,22 @@ package songs.bmses
 							measure[i] = data2;
 							measure[j] = data1;
 						}
-						else if (time1 === time2) // 时间相同，按通道排序。
+						else if (time1 === time2) // 时间相同，按通道排序，另外 stop 排最后！
 						{
-							var in1:Boolean = data1.channel in CHANNEL_ORDER_MAP;
-							var in2:Boolean = data2.channel in CHANNEL_ORDER_MAP;
-							
-							if (!in1 && !in2) // 不需要特定排序，按通道从小到大排列。
+							if (data1.channel == BMS.CHANNEL_STOP) // 第一个是 stop，放后面。
 							{
-								if (data1.channel > data2.channel)
-								{
-									measure[i] = data2;
-									measure[j] = data1;
-								}
-							}
-							else if (!in1 && in2) // 前面的不需特定排序，后面需，交换。
-							{
+								// 往后排（交换）。
 								measure[i] = data2;
 								measure[j] = data1;
 							}
-							else if (in1 && !in2) // 前面的需特定排序，后面不需，不交换。
+							else if (data2.channel == BMS.CHANNEL_STOP) // 第二个是 stop，已经没错，不用排。
 							{
-								
+								// 无动作。
 							}
-							else // 都需特定排序，按照特定排序排列。
+							else if (data1.channel > data2.channel) // 都不是 stop，按通道排序。
 							{
-								if (CHANNEL_ORDER_MAP[data1.channel] > CHANNEL_ORDER_MAP[data2.channel])
-								{
-									trace('特定排序');
-									measure[i] = data2;
-									measure[j] = data1;
-								}
+								measure[i] = data2;
+								measure[j] = data1;
 							}
 						}
 					}

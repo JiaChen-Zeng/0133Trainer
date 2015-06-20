@@ -4,6 +4,7 @@ package songs.bmses
 	import flash.utils.ByteArray;
 	
 	/**
+	 * BMS 数据格式。
 	 * 参考资料：
 	 * http://blog.csdn.net/teajs/article/details/20698733
 	 * http://fileformats.wikia.com/wiki/Be-Music_Script
@@ -37,7 +38,7 @@ package songs.bmses
 		 * 
 		 * 简要说就是为了调整本节 note 的 offset 的，因为改变了一个小节的长度，
 		 * 其中的 note 自然也受到影响。
-		 **/
+		 */
 		public static const CHANNEL_METER:uint			= 2;
 		
 		/** 直接写数值型变速 **/
@@ -52,6 +53,13 @@ package songs.bmses
 		/** 引用数值型变速 **/
 		public static const CHANNEL_BPM_EXTENDED:uint	= 8;
 		
+		/**
+		 * 停止一段时间，所有谱面数据往后移。
+		 * @see '停止时间计算（核心）：'
+		 * @see songs.osus.BMS2OSUConverter#getStopTime()
+		 * @see '为了做到先击打再停止，改变 data 的排列顺序是最简明的做法：'
+		 * @see BMSParser#sortMainData()
+		 */
 		public static const CHANNEL_STOP:uint			= 9;
 		
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
@@ -137,7 +145,6 @@ package songs.bmses
 		
 		public var lntype:uint = 1;
 		
-		// TODO: 看看 Converter 有什么要改的不。
 		public var lnobj:String;
 		
 		public var difficulty:Number = NaN;

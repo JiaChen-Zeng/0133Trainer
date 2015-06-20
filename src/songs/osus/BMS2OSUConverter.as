@@ -132,17 +132,13 @@ package songs.osus
 		
 		private var nextMeterData:Data;
 		
+		private var lastTimingPoint:TimingPoint;
+		
 		/**
 		 * 必须用 Number，这个是原始的 offset 数值，没有 Math.round() 过的。
 		 * 解决小数被舍去的问题。
 		 */
 		private var lastTimingPoint_offset:Number;
-		
-		/**
-		 * 必须用 Number，这个是原始的 offset 数值，没有 Math.round() 过的。
-		 * 为了调整有 stop 的 meter 小节的 offset，需要精确的数值。
-		 */
-		private var thisMeterEndTimingPoint_offset:Number;
 		
 		/**
 		 * 记录最后的 tp 位置，类似于 measureIndex + index / length。
@@ -151,10 +147,19 @@ package songs.osus
 		private var lastTimingPoint_position:Number;
 		
 		/**
+		 * 必须用 Number，这个是原始的 offset 数值，没有 Math.round() 过的。
+		 * 为了调整有 stop 的 meter 小节的 offset，需要精确的数值。
+		 */
+		private var thisMeterEndTimingPoint_offset:Number;
+		
+		/**
 		 * 第一个索引是表示玩家，第二个索引是轨道。
 		 */
 		private var holdingLns:Array = [ [], [] ];
 		
+		/**
+		 * 为了转换长音标模式的 ln。
+		 */
 		private var lastNotes:Array = [ [], [] ];
 		
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
@@ -286,35 +291,40 @@ package songs.osus
 			setKeyCount();
 			delayOperations();
 			
-			keyCounter				= null;
-			haveKeySound			= false;
-			holdingLns				= null;
-			lastBPMData				= null;
-			lastBPM3Data			= null;
-			lastTimingPoint_offset	= NaN;
+			keyCounter					= null;
+			haveKeySound				= false;
+			holdingLns					= null;
+			lastBPMData					= null;
+			lastBPM3Data				= null;
+			lastTimingPoint_offset		= NaN;
 			lastTimingPoint_position	= NaN;
 		}
 		
-		private function getBPMDatas(measure:Vector.<Data>):Vector.<Data>
-		{
-			var bpmDatas:Vector.<Data> = new <Data>[];
-			
-			var measure_length:uint = measure.length;
-			for (var i:int = 0; i < measure_length; i++) 
-			{
-				var data:Data = measure[i];
-				if (data.channel === BMS.CHANNEL_BPM
-				||  data.channel === BMS.CHANNEL_BPM_EXTENDED)
-					bpmDatas.push(data);
-			}
-			
-			return bpmDatas;
-		}
+//		private function getBPMDatas(measure:Vector.<Data>):Vector.<Data>
+//		{
+//			var bpmDatas:Vector.<Data> = new <Data>[];
+//			
+//			var measure_length:uint = measure.length;
+//			for (var i:int = 0; i < measure_length; i++) 
+//			{
+//				var data:Data = measure[i];
+//				if (data.channel === BMS.CHANNEL_BPM
+//				||  data.channel === BMS.CHANNEL_BPM_EXTENDED)
+//					bpmDatas.push(data);
+//			}
+//			
+//			return bpmDatas;
+//		}
 		
 		private function convertData(data:Data):void
 		{
 			setMeterData(data);
 			
+			if (data.measureIndex == 42)
+			{
+				trace(42);
+			}
+				
 			switch (data.channel)
 			{
 				case BMS.CHANNEL_BGM: // 背景音/BGM（WAV）
@@ -423,9 +433,10 @@ package songs.osus
 				{
 					trace('第', thisMeterData.measureIndex, '小节需要放终止 tp');
 					// 没有 bpm，放。
+					osu.timingPoints.push(thisMeterEndTimingPoint);
+					lastTimingPoint = thisMeterEndTimingPoint;
 					lastTimingPoint_offset = thisMeterEndTimingPoint.offset;
 					lastTimingPoint_position = thisMeterData.measureIndex + 1;
-					osu.timingPoints.push(thisMeterEndTimingPoint);
 				}
 				
 				thisMeterData = null;
@@ -523,10 +534,6 @@ package songs.osus
 			else
 				throw new Error('未知的 BPM channel：' + data.channel);
 			
-			lastBPMData = data;
-			lastTimingPoint_offset = offset;
-			lastTimingPoint_position = data.measureIndex + data.index / data.length;
-			
 			// TODO: 可以不要下面这一段，直接在 :275 左右的 .delayOperation() 之后建一个函数，
 			// 删除所有 tp 中相同 offset 和 type 的 tp。
 			
@@ -544,6 +551,10 @@ package songs.osus
 			
 			// 这句话不包括在上面说的“下面这一段”哦！
 			tps.push(tp);
+			lastBPMData = data;
+			lastTimingPoint = tp;
+			lastTimingPoint_offset = offset;
+			lastTimingPoint_position = data.measureIndex + data.index / data.length;
 		}
 		
 		private function getPrevTimingPoint(index:uint, type:uint):TimingPoint
@@ -573,10 +584,11 @@ package songs.osus
 //			tp.time = getUnknownTimeByMeter(data, lastBPM3Data);
 //			tp.type = TimingPoint.TYPE_INHERITED;
 			
+			osu.timingPoints.push(tp);
 			thisMeterData = data;
+			lastTimingPoint = tp;
 			lastTimingPoint_offset = offset;
 			lastTimingPoint_position = data.measureIndex;
-			osu.timingPoints.push(tp);
 			
 			// 缓存终止 TP。这时候参照的 offset 是上面的那个哟。
 			const endTp:TimingPoint = new TimingPoint();
@@ -602,16 +614,45 @@ package songs.osus
 			tp.time = STOP_TIME;
 			tp.type = TimingPoint.TYPE_TIMING;
 			
-			// 加一个结束 tp 停止结束。
+			// 加一个结束 tp 停止结束。原本是这么想的。
+			// 但是如果最后一个 tp 是变速（由 BPM_EXTENDED 转来），
+			// 需要先加原 BPM 的 tp（timing），再加变速 tp（inherited），
+			// 并且为了防止 osu 的 tp 重叠 bug，如果和开始停止的 tp.offset 一样的话把变速 tp 删了。
+			const tps:Vector.<TimingPoint> = osu.timingPoints;
 			const endTp:TimingPoint = new TimingPoint();
+			var endTp2:TimingPoint; // 是变速的情况，附加的 TimingPoint.TYPE_TIMING。
 			const stopTime:Number = getStopTime(data);
-			endTp.offset = Math.round(offset + stopTime);
-			endTp.time = MINUTE / lastBPMData.content;
-			endTp.type = TimingPoint.TYPE_TIMING;
+			const offset2:Number = offset + stopTime
+			if (lastTimingPoint.type == TimingPoint.TYPE_TIMING) // 不是变速
+			{
+				endTp.offset = Math.round(offset2);
+				endTp.time = lastTimingPoint.time;
+				endTp.type = TimingPoint.TYPE_TIMING;
+				tps.push(tp, endTp);
+			}
+			else // 是变速
+			{
+				// 为了防止 osu 的 tp 重叠 bug，如果和开始停止的 tp.offset 一样的话把变速 tp 删了。
+				if (lastTimingPoint.offset == tp.offset)
+					tps.splice(tps.length - 1, 1); // 删去最后一个，即那个变速 tp。
+				
+				endTp2 = new TimingPoint();
+				
+				// endTp 为变速 tp。
+				endTp.offset = endTp2.offset = Math.round(offset2);
+				endTp.time = lastTimingPoint.time;
+				endTp.type = lastTimingPoint.type;
+				
+				// endTp2 为 Timing tp。
+				endTp2.time = MINUTE / lastBPM3Data.content;
+				endTp2.type = TimingPoint.TYPE_TIMING;
+				
+				tps.push(tp, endTp2, endTp); // 是先 endTp2 再 endTp，TIMING 要在 INHERITED 的后面。
+			}
 			
+			lastTimingPoint = endTp;
 			lastTimingPoint_offset = offset + stopTime;
 			lastTimingPoint_position = data.measureIndex + data.index / data.length;
-			osu.timingPoints.push(tp, endTp);
 			
 			// 重新调整（延后） meter 结束 tp 的 offset。
 			if (thisMeterEndTimingPoint)
@@ -932,7 +973,12 @@ package songs.osus
 		private function getMeasureTime(bpmData:Data, meterData:Data = null):Number
 		{
 			// TP 的 time 和这个没关系。
-			const num:Number = MINUTE / (bpmData.channel === BMS.CHANNEL_BPM ? bpmData.content : bms.bpms[bpmData.content]) * 4 * (meterData ? meterData.content : 1);
+			const num:Number = MINUTE /
+				(bpmData.channel === BMS.CHANNEL_BPM ? // 判断是 BPM 还是 BPM_EXTENDED，获取当前 BPM。
+					bpmData.content :
+					bms.bpms[bpmData.content]) * 4 * (meterData ? // 获取当前 meter，没有的话就是默认的 1。
+														meterData.content :
+														1);
 			return num;
 		}
 		
@@ -1002,12 +1048,18 @@ package songs.osus
 			return Math.round(60000 / osu.bpm * 4 * (measureIndex + (index === 0 ? 0 : index * 1 / length)));
 		}
 		/**
-		 * 延后的时间公式：(600000（一分钟毫秒数） / 60（BPM）)（每拍时间）* 4（拍） * 48（STOP值） / 192（最大节拍细分） == 1
+		 * 延后的时间公式：(60000（一分钟毫秒数） / 60（BPM）)（每拍时间）* 4（拍） * 48（STOP值） / 192（最大节拍细分） == 1
 		 * MINUTE / bpm * 4 * stop / MAX_DIVISION
+		 * @see songs.bmses.BMS#CHANNEL_STOP
 		 */
 		private function getStopTime(data:Data):Number
 		{
-			return MINUTE / lastBPMData.content * 4 * data.content / MAX_DIVISION;
+			const stopTime:Number = MINUTE /
+				(lastBPMData.channel === BMS.CHANNEL_BPM ? // 判断是 BPM 还是 BPM_EXTENDED。
+				lastBPMData.content :
+				bms.bpms[lastBPMData.content]) *
+				4 * bms.stops[data.content] / MAX_DIVISION;
+			return stopTime;
 		}
 	}
 }
