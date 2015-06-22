@@ -114,17 +114,17 @@ package songs.osus
 			if (dst.exists)
 			{
 				// TODO: 检验MD5是否相同，相同即跳过。
-				trace('already exists:', decodeURIComponent(dst.url)); // 让葵先摆脱一下复制地狱。
+//				trace('already exists:', decodeURIComponent(dst.url)); // 让葵先摆脱一下复制地狱。
 				return;
 			}
 			
 			if (!file.exists)
 			{
-				trace('not exists:', decodeURIComponent(dst.url));
+//				trace('not exists:', decodeURIComponent(dst.url));
 			}
 			else
 			{
-				trace('save:', decodeURIComponent(dst.url));
+//				trace('save:', decodeURIComponent(dst.url));
 				try
 				{
 					file.copyTo(dst, true);

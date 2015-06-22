@@ -15,7 +15,7 @@ package songs.osus
 		//
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		
-		private static const LANE_MAP:Object =
+		private static const LANE_MAP_BMS:Object =
 		{
 			16: 0,
 			11: 1,
@@ -54,9 +54,32 @@ package songs.osus
 			69: 7
 		};
 		
-		public static var PREFIX_SOUND_FILE:String = 'audios/';
+		private static const LANE_MAP_PMS:Object =
+		{
+			11: 0,
+			12: 1,
+			13: 2,
+			14: 3,
+			15: 4,
+			22: 5,
+			23: 6,
+			24: 7,
+			25: 8,
+			
+			51: 0,
+			52: 1,
+			53: 2,
+			54: 3,
+			55: 4,
+			62: 5,
+			63: 6,
+			64: 7,
+			65: 8
+		};
 		
-		public static var PREFIX_BMP_FILE:String = 'imgs/';
+		public static var PREFIX_SOUND_FILE:String = 'wav/';
+		
+		public static var PREFIX_BMP_FILE:String = 'bmp/';
 		
 		private static const MINUTE:uint = 60000;
 		
@@ -64,6 +87,8 @@ package songs.osus
 		
 		/** 从 Sakuzyo - Altale (__M A S__) [7K MX] 里找到的 time 数值，感谢神麻婆 mas！ **/
 		private static const STOP_TIME:Number = 999999999.666667;
+		
+		private static const re_video:RegExp = /\.(avi|mpg|mpeg)$/i;
 		
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		//
@@ -153,6 +178,11 @@ package songs.osus
 		private var thisMeterEndTimingPoint_offset:Number;
 		
 		/**
+		 * 为了正确计算有节拍的，并且其中还有变速的小节的 offset，需要记录位置。
+		 */
+		private var thisMeterEndTimingPoint_position:Number;
+		
+		/**
 		 * 第一个索引是表示玩家，第二个索引是轨道。
 		 */
 		private var holdingLns:Array = [ [], [] ];
@@ -171,6 +201,7 @@ package songs.osus
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		//  Converts
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
+
 		
 		public function convert(specialStyle:uint = 1):Beatmap
 		{
@@ -218,7 +249,9 @@ package songs.osus
 		{
 			var res:Object = matchTitle();
 			osu.title = osu.titleUnicode = res.title;
-			osu.artist = osu.artistUnicode = bms.artist;
+			osu.artist = osu.artistUnicode = bms.subartist ?
+				bms.artist :
+				bms.artist + ' & ' + bms.subartist;
 			osu.version = 'Lv. ' + bms.playlevel.toString() || '?';
 			if (res.version)
 				osu.version += ' ' + res.version;
@@ -234,6 +267,7 @@ package songs.osus
 //			osu.name = StringUtil.substitute('{0} - {1} ({2}) [{3}]',
 //				osu.artist || 'Unkown', osu.title || '', osu.creator, osu.version);
 			osu.name = bms.name;
+			osu.tags = 'bms conversion ' + bms.genre;
 		}
 		
 		private function matchTitle():Object
@@ -291,13 +325,19 @@ package songs.osus
 			setKeyCount();
 			delayOperations();
 			
-			keyCounter					= null;
-			haveKeySound				= false;
-			holdingLns					= null;
-			lastBPMData					= null;
-			lastBPM3Data				= null;
-			lastTimingPoint_offset		= NaN;
-			lastTimingPoint_position	= NaN;
+			keyCounter							= null;
+			haveKeySound						= false;
+			holdingLns							= null;
+			lastBPMData							= null;
+			lastBPM3Data						= null;
+			lastTimingPoint						= null;
+			lastTimingPoint_offset				= NaN;
+			lastTimingPoint_position			= NaN;
+			thisMeterData						= null;
+			thisMeterTimingPoint				= null;
+			thisMeterEndTimingPoint				= null;
+			thisMeterEndTimingPoint_offset		= NaN;
+			thisMeterEndTimingPoint_position	= NaN;
 		}
 		
 //		private function getBPMDatas(measure:Vector.<Data>):Vector.<Data>
@@ -320,11 +360,6 @@ package songs.osus
 		{
 			setMeterData(data);
 			
-			if (data.measureIndex == 42)
-			{
-				trace(42);
-			}
-				
 			switch (data.channel)
 			{
 				case BMS.CHANNEL_BGM: // 背景音/BGM（WAV）
@@ -433,14 +468,33 @@ package songs.osus
 				{
 					trace('第', thisMeterData.measureIndex, '小节需要放终止 tp');
 					// 没有 bpm，放。
+					// 此处为了正确计算 offset，修改了。
+					if (uint(thisMeterEndTimingPoint_position) == thisMeterEndTimingPoint_position) // 一样，说明其中没有 bpm，
+					{
+						// 直接算整个小节。
+						thisMeterEndTimingPoint_offset = thisMeterEndTimingPoint_offset +
+							getMeasureTime(lastBPMData, thisMeterData)
+					}
+					else // 其中还有 bpm，
+					{
+						// 再附加最后一段。
+						thisMeterEndTimingPoint_offset = thisMeterEndTimingPoint_offset +
+							getMeasureTime(lastBPMData, thisMeterData) *
+							(Math.ceil(thisMeterEndTimingPoint_position) - thisMeterEndTimingPoint_position);
+					}
+					
+					thisMeterEndTimingPoint.offset = Math.round(thisMeterEndTimingPoint_offset);
+					
 					osu.timingPoints.push(thisMeterEndTimingPoint);
 					lastTimingPoint = thisMeterEndTimingPoint;
-					lastTimingPoint_offset = thisMeterEndTimingPoint.offset;
+					lastTimingPoint_offset = thisMeterEndTimingPoint_offset; // 原来这里赋给了 round 后的整数，错了！
 					lastTimingPoint_position = thisMeterData.measureIndex + 1;
 				}
 				
 				thisMeterData = null;
 				thisMeterEndTimingPoint = null;
+				thisMeterEndTimingPoint_offset = NaN
+				thisMeterEndTimingPoint_position = NaN
 			}
 		}
 		
@@ -512,6 +566,7 @@ package songs.osus
 		
 		private function convertBPM(data:Data):void
 		{
+			// 开始转。
 			const tp:TimingPoint = new TimingPoint();
 			const offset:Number = lastBPMData ?
 //				getOffset2(data, lastBPMData, thisMeterData) :
@@ -530,9 +585,35 @@ package songs.osus
 				// BPM 一定会在 BPM_EXTENDED 之前出现，lastBPM3Data 就不用判断了。没有的话，我也要让他有！
 				tp.time = getUnknownTime(data, lastBPM3Data);
 				tp.type = TimingPoint.TYPE_INHERITED;
+				
+				// 判断超变速的话稍微处理一下，因为这不是 Timing tp，
+				// 不会跟下面那段和 meter tp 重叠删除什么的冲突，大概。
+				if (Math.round(tp.time) == 0) // 如果是超变速（瞬间突降），
+				{
+					// 提前 1ms，这是我试出来这样子设置才可以，
+					// 不然2个相同 offset 的 tp 重叠的话什么也没有发生，
+					// 大概是被“覆盖”了吧。
+					tp.offset -= 1;
+				}
 			}
 			else
 				throw new Error('未知的 BPM channel：' + data.channel);
+			
+			// 这里要在 lastBPMData 改变之前先用之前的 bpm 给这个小节的 meter 算时间。
+			if (thisMeterEndTimingPoint)
+			{
+				const position:Number = data.measureIndex + data.index / data.length;
+				// meter 结束 tp 参照的是最后的 tp，小节内有 bpm 改变了的话要参照它。
+				thisMeterEndTimingPoint.time = MINUTE /
+					(data.channel === BMS.CHANNEL_BPM ? // 判断是 BPM 还是 BPM_EXTENDED。
+					data.content :
+					bms.bpms[lastBPMData.content]);
+				// 增加 meter end tp 的 offset。
+				thisMeterEndTimingPoint_offset +=
+					getMeasureTime(lastBPMData, thisMeterData) * (position - thisMeterEndTimingPoint_position);
+				// 改变 meter end tp 的参照 position。
+				thisMeterEndTimingPoint_position = position;
+			}
 			
 			// TODO: 可以不要下面这一段，直接在 :275 左右的 .delayOperation() 之后建一个函数，
 			// 删除所有 tp 中相同 offset 和 type 的 tp。
@@ -579,7 +660,11 @@ package songs.osus
 //			var offset:Number = getOffset2(data, lastBPMData, thisMeterData);
 			const offset:Number = getOffset3(data);
 			tp.offset = Math.round(offset);
-			tp.time = MINUTE / lastBPMData.content;
+			// 现在我把 :583 这一句和 :598 这一句的 lastBPMData 用 lastBPM3Data 代替，试试行不行。
+			// 再次修改，换成了获取最后 bpm 的，这个才是正确的，但是 d 什么那个谱又 99598*** 了。
+			tp.time = MINUTE / (lastBPMData.channel === BMS.CHANNEL_BPM ? // 判断是 BPM 还是 BPM_EXTENDED。
+				lastBPMData.content :
+				bms.bpms[lastBPMData.content]); // 原来这里原来就错了，一直就是错的，后来被转 bpm 的函数删掉了所以没影响？
 			tp.type = TimingPoint.TYPE_TIMING;
 //			tp.time = getUnknownTimeByMeter(data, lastBPM3Data);
 //			tp.type = TimingPoint.TYPE_INHERITED;
@@ -591,14 +676,21 @@ package songs.osus
 			lastTimingPoint_position = data.measureIndex;
 			
 			// 缓存终止 TP。这时候参照的 offset 是上面的那个哟。
+			
+			// 后面发现这样不对的。那只能先存这个起始 tp 的 offset，
+			// 然后在这个小节内如果发现 bpm，就给 offset 加时间，
+			// 到小节尾的时候，再算与最后一个 bpm（没有的话就小节头）相隔的时间。
 			const endTp:TimingPoint = new TimingPoint();
-			const endTp_offset:Number = getMeasureTime(lastBPMData, thisMeterData) + offset;
-			endTp.offset = Math.round(endTp_offset);
-			endTp.time = MINUTE / lastBPMData.content;
+//			const endTp_offset:Number = getMeasureTime(lastBPMData, thisMeterData) + offset;
+//			endTp.offset = Math.round(endTp_offset);
+			endTp.time = MINUTE / (lastBPMData.channel === BMS.CHANNEL_BPM ? // 判断是 BPM 还是 BPM_EXTENDED。
+				lastBPMData.content :
+				bms.bpms[lastBPMData.content]);
 			endTp.type = TimingPoint.TYPE_TIMING;
 			
 			thisMeterEndTimingPoint = endTp;
-			thisMeterEndTimingPoint_offset = endTp_offset;
+			thisMeterEndTimingPoint_offset = offset;
+			thisMeterEndTimingPoint_position = data.measureIndex + data.index / data.length;
 		}
 		
 		/**
@@ -656,8 +748,7 @@ package songs.osus
 			
 			// 重新调整（延后） meter 结束 tp 的 offset。
 			if (thisMeterEndTimingPoint)
-				thisMeterEndTimingPoint.offset = 
-					thisMeterEndTimingPoint_offset = thisMeterEndTimingPoint_offset + stopTime; 
+				thisMeterEndTimingPoint_offset = thisMeterEndTimingPoint_offset + stopTime; 
 		}
 		
 		private function convertBGM(data:Data):void
@@ -687,7 +778,11 @@ package songs.osus
 		
 		private function convertBGA(data:Data):void
 		{
-			// TODO: note和音乐先确保了再做~
+			// TODO: 调整好 offset。
+			if (osu.video)
+				throw new Error('有多个 video，只转一个 video 不行！');
+			else
+				osu.video = bms.bmps[data.content];
 		}
 		
 		// TODO: 重构 .convertNote() 和 .convertLongNote()，在每个 note 上附加 按下/抬起 属性，这是作为中间者。
@@ -695,7 +790,7 @@ package songs.osus
 		
 		private function convertNote(data:Data):void
 		{
-			const lane:uint = LANE_MAP[data.channel];
+			const lane:uint = mapLane(data.channel);
 			const player:uint = getPlayer(data.channel);
 			const offset:uint = Math.round(getOffset3(data));
 			
@@ -746,13 +841,13 @@ package songs.osus
 			// 简单地十位数用玩家索引，个位数用轨道。
 			// 等会只会计算有几个元素所以是没问题的。
 			keyCounter[player * 10 + lane] = true;
-			if (lane === 0)
+			if (lane === 0 && bms.extension != 'pms')
 				haveScratch = true;
 		}
 		
 		private function convertLongNote(data:Data):void
 		{
-			const lane:uint = LANE_MAP[data.channel];
+			const lane:uint = mapLane(data.channel);
 			const player:uint = getPlayer(data.channel);
 			const offset:uint = Math.round(getOffset3(data));
 //			var offset:uint = Math.round(getOffset2(data, lastBPMData, thisMeterData));
@@ -793,7 +888,7 @@ package songs.osus
 			// 简单地十位数用玩家索引，个位数用轨道。
 			// 等会只会计算有几个元素所以是没问题的。
 			keyCounter[player * 10 + lane] = true;
-			if (lane === 0)
+			if (lane === 0 && bms.extension != 'pms')
 				haveScratch = true;
 			
 			trace('第 ' + lane + ' 道，offset: ' + offset);
@@ -895,17 +990,17 @@ package songs.osus
 			const hitObjects:Vector.<HitObject> = osu.hitObjects;
 			var doRemapHitObjects:Boolean =
 				Main.current.addNoScratch === '是' && haveScratch && osu.kc !== 7;
-			trace('============================================');
-			trace('|                                          |');
-			trace('|             doRemapHitObjects:           |');
-			trace('|                                          |');
-			trace('|                                          |');
-			trace('|          ' + doRemapHitObjects + '             |');
-			trace('|                                          |');
-			trace('|    ' + bms.player + '                            |');
-			trace('|                                          |');
-			trace('|            ' + bms.name + '                    |');
-			trace('============================================');
+//			trace('============================================');
+//			trace('|                                          |');
+//			trace('|             doRemapHitObjects:           |');
+//			trace('|                                          |');
+//			trace('|                                          |');
+//			trace('|          ' + doRemapHitObjects + '             |');
+//			trace('|                                          |');
+//			trace('|    ' + bms.player + '                            |');
+//			trace('|                                          |');
+//			trace('|            ' + bms.name + '                    |');
+//			trace('============================================');
 			
 			if (doRemapHitObjects)
 			{
@@ -1060,6 +1155,19 @@ package songs.osus
 				bms.bpms[lastBPMData.content]) *
 				4 * bms.stops[data.content] / MAX_DIVISION;
 			return stopTime;
+		}
+		
+		private function mapLane(channel:uint):uint
+		{
+			if (bms.extension == 'pms')
+				return LANE_MAP_PMS[channel];
+			else
+				return LANE_MAP_BMS[channel];
+		}
+		
+		private function isVideo(name:String):Boolean
+		{
+			return re_video.test(name);
 		}
 	}
 }

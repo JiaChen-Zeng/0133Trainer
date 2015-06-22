@@ -125,6 +125,7 @@ package songs.bmses
 			// TODO: 选择转什么码，自动转码。
 			var bms:BMS = new BMS(this);
 			bms.name = FileReferenceUtil.getBaseName(file);
+			bms.extension = file.extension;
 			bms.setData(file.data, Main.current.encoding);
 			bms.load();
 			_bmses.push(bms);

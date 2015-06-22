@@ -79,6 +79,11 @@ package songs.bmses
 		public static function isBMS(file:File):Boolean
 		{
 			var extension:String = file.extension;
+			if (!file.extension)
+				return false;
+			else
+				extension = extension.toLowerCase();
+			
 			return extension == 'bms'
 				|| extension == 'bme'
 				|| extension == 'bml'
@@ -194,6 +199,8 @@ package songs.bmses
 		 * BMS 文件的名字。不包括后缀名。
 		 */
 		public var name:String;
+		
+		public var extension:String;
 		
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		//

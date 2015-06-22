@@ -1,4 +1,4 @@
-osu file format v13
+osu file format v14
 
 [General]
 AudioFilename: virtual
@@ -40,7 +40,8 @@ SliderTickRate:1
 
 [Events]
 //Background and Video events
-0,0,"{background}"
+0,0,"{background}",0,0
+Video,0,"{video}"
 //Break Periods
 //Storyboard Layer 0 (Background)
 //Storyboard Layer 1 (Fail)

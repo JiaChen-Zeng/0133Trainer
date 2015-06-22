@@ -85,6 +85,8 @@ package songs.osus
 		
 		internal var background:String;
 		
+		internal var video:String;
+		
 		internal var sbBackgrounds:Vector.<SBBackGround> = new <SBBackGround>[];
 		
 		internal var sounds:Vector.<Sound> = new <Sound>[];

@@ -72,7 +72,7 @@ package songs.bmses
 				// 按属性的类型来赋值。
 				const attr:String = key.toLowerCase();
 				
-				if (attr == 'difficalty') // 辣鸡谱师连英文都会拼错，葵真是服了！
+				if (attr == 'difficalty') // 辣鸡谱师连英文都会拼错，我真是服了！
 				{
 					bms.difficulty = parseInt(value);
 					trace('this[' + key.toLowerCase()+ '] = ' + value + ';');
@@ -229,7 +229,7 @@ package songs.bmses
 		 */
 		private function fixWav(fileName:String):String
 		{
-			const re:RegExp = /\.(\w+)$/;
+			const re:RegExp = /\.(\w+)$i/;
 			const dir:File = bms.bmsPack.directory;
 			
 			var file:File = dir.resolvePath(BMS2OSUConverter.matchPath(fileName));
@@ -238,6 +238,13 @@ package songs.bmses
 			
 			fileName = fileName.replace(re, '.ogg');
 			file = dir.resolvePath(BMS2OSUConverter.matchPath(fileName));
+			
+			if (file.exists)
+				return fileName;
+			
+			fileName = fileName.replace(re, '.wav');
+			file = dir.resolvePath(BMS2OSUConverter.matchPath(fileName));
+			
 			if (file.exists)
 				return fileName;
 			else
@@ -251,15 +258,19 @@ package songs.bmses
 		
 		private function fixBmp(fileName:String):String
 		{
-			const re:RegExp = /\.(\w+)$/;
 			const dir:File = bms.bmsPack.directory;
 			
 			var file:File = dir.resolvePath(BMS2OSUConverter.matchPath(fileName));
 			if (file.exists)
 				return fileName;
 			
+			const re:RegExp = /\.(\w+)$/i;
+			
+			// 全部都j8试一遍。
+			// 图片：
 			fileName = fileName.replace(re, '.png');
 			file = dir.resolvePath(BMS2OSUConverter.matchPath(fileName));
+			
 			if (file.exists)
 				return fileName;
 			
@@ -269,13 +280,36 @@ package songs.bmses
 			if (file.exists)
 				return fileName;
 			
+			fileName = fileName.replace(re, '.jpeg');
+			file = dir.resolvePath(BMS2OSUConverter.matchPath(fileName));
+			
+			if (file.exists)
+				return fileName;
+			
+			fileName = fileName.replace(re, '.bmp');
+			file = dir.resolvePath(BMS2OSUConverter.matchPath(fileName));
+			
+			if (file.exists)
+				return fileName;
+			
+			// 视频：
 			fileName = fileName.replace(re, '.mpg');
 			file = dir.resolvePath(BMS2OSUConverter.matchPath(fileName));
 			
 			if (file.exists)
-			{
 				return fileName;
-			}
+			
+			fileName = fileName.replace(re, '.mpeg');
+			file = dir.resolvePath(BMS2OSUConverter.matchPath(fileName));
+			
+			if (file.exists)
+				return fileName;
+			
+			fileName = fileName.replace(re, '.avi');
+			file = dir.resolvePath(BMS2OSUConverter.matchPath(fileName));
+			
+			if (file.exists)
+				return fileName;
 			else
 			{
 				// TODO: 提示。

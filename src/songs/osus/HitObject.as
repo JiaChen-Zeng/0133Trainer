@@ -43,7 +43,7 @@ package songs.osus
 		
 		/**
 		 * mania n 道对应坐标。（n 从零开始）
-		 * x = 512 * (n + 0.5) / k
+		 * x = 512 * (n + 0.5) / k（向下取整）
 		 * y = 192
 		 */
 		internal var x:Number = NaN;
@@ -99,20 +99,28 @@ package songs.osus
 		 */
 		public function setPosition(keyCount:uint):void
 		{
-			if (player === 0)
-				x = uint(512 * (lane + 0.5) / keyCount);
-			else if (player === 1)
+			if (keyCount == 9) // PMS
 			{
-				// 第二玩家皿位在最右边。
-				// 这里 - 0.5 其实是 0.5 - 1。
-				// 因为皿位去掉了，要往前移一位。
-				if (lane === 0)
-					x = uint(512 * (keyCount - 0.5) / keyCount);
-				else
-					x = uint(512 * (lane + keyCount / 2 - 0.5) / keyCount);
+				x = uint(512 * (lane + 0.5) / keyCount);
 			}
-			else
-				throw new Error('不存在的玩家索引：' + player);
+			else // BMS
+			{
+				if (player === 0)
+					x = uint(512 * (lane + 0.5) / keyCount);
+				else if (player === 1)
+				{
+					// 第二玩家皿位在最右边。
+					// 这里 - 0.5 其实是 0.5 - 1。
+					// 因为皿位去掉了，要往前移一位。
+					if (lane === 0)
+						x = uint(512 * (keyCount - 0.5) / keyCount);
+					else
+						x = uint(512 * (lane + keyCount / 2 - 0.5) / keyCount);
+				}
+				else
+					throw new Error('不存在的玩家索引：' + player);
+			}
+			
 			y = 192;
 		}
 	}
