@@ -782,7 +782,11 @@ package songs.osus
 			if (osu.video)
 				throw new Error('有多个 video，只转一个 video 不行！');
 			else
-				osu.video = bms.bmps[data.content];
+			{
+				const path:String = bms.bmps[data.content];
+				if (path)
+					osu.video = PREFIX_BMP_FILE + path;
+			}
 		}
 		
 		// TODO: 重构 .convertNote() 和 .convertLongNote()，在每个 note 上附加 按下/抬起 属性，这是作为中间者。
