@@ -88,7 +88,9 @@ package songs.osus
 		/** 从 Sakuzyo - Altale (__M A S__) [7K MX] 里找到的 time 数值，感谢神麻婆 mas！ **/
 		private static const STOP_TIME:Number = 999999999.666667;
 		
-		private static const re_video:RegExp = /\.(avi|mpg|mpeg)$/i;
+		private static const RE_VIDEO:RegExp = /\.(avi|mpg|mpeg)$/i;
+		
+		public static const FORMAT_CONVERT:String = '.flv';
 		
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		//
@@ -785,7 +787,14 @@ package songs.osus
 			{
 				const path:String = bms.bmps[data.content];
 				if (path)
-					osu.video = PREFIX_BMP_FILE + path;
+				{
+					const re:RegExp = /\.(mpg|mpeg)$/i;
+					
+					if (re.test(path)) // 如果是 mpg 的格式，修改它的引用成能播的，文件转换在 Beatmap 里。
+						osu.video = PREFIX_BMP_FILE + path.replace(re, FORMAT_CONVERT);
+					else
+						osu.video = PREFIX_BMP_FILE + path;
+				}
 			}
 		}
 		
@@ -1171,7 +1180,7 @@ package songs.osus
 		
 		private function isVideo(name:String):Boolean
 		{
-			return re_video.test(name);
+			return RE_VIDEO.test(name);
 		}
 	}
 }

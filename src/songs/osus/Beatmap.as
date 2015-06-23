@@ -1,12 +1,16 @@
 package songs.osus
 {
-	import moe.aoi.utils.FileReferenceUtil;
-	
+	import flash.events.Event;
+	import flash.events.NativeProcessExitEvent;
 	import flash.filesystem.File;
 	import flash.filesystem.FileMode;
 	import flash.filesystem.FileStream;
 	import flash.net.registerClassAlias;
 	import flash.utils.ByteArray;
+	
+	import assets.FFMPEG;
+	
+	import moe.aoi.utils.FileReferenceUtil;
 	
 	import songs.bmses.BMS;
 	import songs.bmses.BMSPack;
@@ -108,23 +112,46 @@ package songs.osus
 		private function saveFile(fileName:String, path:String):void
 		{
 			const file:File = directory.resolvePath(BMS2OSUConverter.matchPath(fileName));
-			const dst:File = outputDirectory.resolvePath(name + '/' + path + file.name);
+			const extension:String = file.extension;
+			var dst:File;
+			
+			// bga 复制。
+			if (extension == 'mpg'
+			||  extension == 'mpeg') // 如果是 mpg 格式的 bga，转换。
+				dst = outputDirectory.resolvePath(name + '/' + path + FileReferenceUtil.getBaseName(file) + BMS2OSUConverter.FORMAT_CONVERT);
+			else
+				dst = outputDirectory.resolvePath(name + '/' + path + file.name);
+			
+			// 其他文件复制。
 			// TODO: 覆盖？
 			// TODO: 判断文件不存在给提示。
 			if (dst.exists)
 			{
 				// TODO: 检验MD5是否相同，相同即跳过。
-//				trace('already exists:', decodeURIComponent(dst.url)); // 让葵先摆脱一下复制地狱。
+				trace('already exists:', decodeURIComponent(dst.url)); // 让我先摆脱一下复制地狱。
 				return;
 			}
 			
 			if (!file.exists)
 			{
-//				trace('not exists:', decodeURIComponent(dst.url));
+				trace('not exists:', decodeURIComponent(dst.url));
+				return;
+			}
+			
+			trace('save:', decodeURIComponent(dst.url));
+			
+			if (extension == 'mpg'
+			||  extension == 'mpeg')
+			{
+				const ffmpeg:FFMPEG = new FFMPEG(File.applicationDirectory.resolvePath('assets/ffmpeg.exe'));
+				ffmpeg.addEventListener(NativeProcessExitEvent.EXIT, function(event:Event):void
+				{
+					trace(decodeURIComponent(dst.nativePath), ': convert complete');
+				});
+				ffmpeg.convert(file.nativePath, dst.nativePath); // 用 url 不行，它不认。
 			}
 			else
 			{
-//				trace('save:', decodeURIComponent(dst.url));
 				try
 				{
 					file.copyTo(dst, true);
