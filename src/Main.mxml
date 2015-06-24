@@ -48,8 +48,6 @@
 		<![CDATA[
 			import mx.events.FlexEvent;
 			
-			import assets.FFMPEG;
-			
 			import songs.bmses.BMS;
 			import songs.bmses.BMSPack;
 			import songs.osus.BMS2OSUConverter;

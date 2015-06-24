@@ -127,10 +127,14 @@ package songs.bmses
 		
 		public var title:String;
 		
+		public var subtitle:String;
+		
 		public var artist:String;
 		
 		// TODO: 再加上 & subartist。
 		public var subartist:String;
+		
+		public var sideauthor:String;
 		
 		public var bpm:Number = NaN;
 		
@@ -154,7 +158,10 @@ package songs.bmses
 		
 		public var difficulty:Number = NaN;
 		
-		public var subtitle:String;
+		/** 好像是 pms 的额外文件链接？.chp 格式的。 */
+		public var charfile:String;
+		
+		public var comment:String;
 		
 		// TODO: 音效声音。
 		public var volwav:Number = 70;

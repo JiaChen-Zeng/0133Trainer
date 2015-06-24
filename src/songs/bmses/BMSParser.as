@@ -78,6 +78,12 @@ package songs.bmses
 					trace('this[' + key.toLowerCase()+ '] = ' + value + ';');
 					return;
 				}
+				else (attr == 'inobj')
+				{
+					bms.lnobj = value;
+					trace('this[' + key.toLowerCase()+ '] = ' + value + ';');
+					return;
+				}
 				
 //				trace(typeof bms[attr]);
 				
@@ -229,13 +235,13 @@ package songs.bmses
 		 */
 		private function fixWav(fileName:String):String
 		{
-			const re:RegExp = /\.(\w+)$i/;
 			const dir:File = bms.bmsPack.directory;
 			
 			var file:File = dir.resolvePath(BMS2OSUConverter.matchPath(fileName));
 			if (file.exists)
 				return fileName;
 			
+			const re:RegExp = /\.(\w+)$/i;
 			fileName = fileName.replace(re, '.ogg');
 			file = dir.resolvePath(BMS2OSUConverter.matchPath(fileName));
 			

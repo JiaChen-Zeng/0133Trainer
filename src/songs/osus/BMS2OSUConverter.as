@@ -13,7 +13,7 @@ package songs.osus
 		//
 		//  Class constants
 		//
-		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
+		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆ ☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		
 		private static const LANE_MAP_BMS:Object =
 		{
@@ -252,8 +252,8 @@ package songs.osus
 			var res:Object = matchTitle();
 			osu.title = osu.titleUnicode = res.title;
 			osu.artist = osu.artistUnicode = bms.subartist ?
-				bms.artist :
-				bms.artist + ' & ' + bms.subartist;
+				bms.artist + ' & ' + bms.subartist :
+				bms.artist;
 			osu.version = 'Lv. ' + bms.playlevel.toString() || '?';
 			if (res.version)
 				osu.version += ' ' + res.version;
@@ -782,7 +782,9 @@ package songs.osus
 		{
 			// TODO: 调整好 offset。
 			if (osu.video)
-				throw new Error('有多个 video，只转一个 video 不行！');
+			{
+//				throw new Error('有多个 video，只转一个 video 不行！');
+			}
 			else
 			{
 				const path:String = bms.bmps[data.content];
