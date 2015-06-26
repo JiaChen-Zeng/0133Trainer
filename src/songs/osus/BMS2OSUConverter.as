@@ -227,6 +227,7 @@ package songs.osus
 				}
 				
 				beatmap.name = bmsPack.directory.name;
+				beatmap.bmsPack = bmsPack;
 			}
 			
 			return beatmap;
@@ -263,12 +264,14 @@ package songs.osus
 			// TODO: 如果没有 stageFile 的话就取第一个出现的 04 通道的 BMP。话说 BMS 的图片都这么小……？
 			if (bms.stagefile)
 				osu.background = PREFIX_BMP_FILE + bms.stagefile;
+			else if (bms.backbmp)
+				osu.background = PREFIX_BMP_FILE + bms.backbmp;
 			// TODO: 取第一次设置的的节拍？
 //			meter = 
 			// 我靠会重名。
 //			osu.name = StringUtil.substitute('{0} - {1} ({2}) [{3}]',
 //				osu.artist || 'Unkown', osu.title || '', osu.creator, osu.version);
-			osu.name = bms.name;
+			osu.name = bms.name + '.' + bms.extension;
 			osu.tags = 'bms conversion ' + bms.genre;
 		}
 		

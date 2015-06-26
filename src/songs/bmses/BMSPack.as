@@ -8,6 +8,8 @@ package songs.bmses
 	
 	import mx.utils.StringUtil;
 	
+	import events.BMSEvent;
+	
 	import moe.aoi.utils.FileReferenceUtil;
 
 	//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
@@ -16,6 +18,12 @@ package songs.bmses
 	
 	[Event(name="complete", type="flash.events.Event")]
 	[Event(name="ioError", type="flash.events.IOErrorEvent")]
+	[Event(name="collecting", type="events.BMSEvent")]
+	[Event(name="collected", type="events.BMSEvent")]
+	[Event(name="loading", type="events.BMSEvent")]
+	[Event(name="loaded", type="events.BMSEvent")]
+	[Event(name="parsing", type="events.BMSEvent")]
+	[Event(name="parsed", type="events.BMSEvent")]
 	
 	/**
 	 * 装着 bms 的文件夹用这个类表示。
@@ -48,6 +56,7 @@ package songs.bmses
 		//
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		
+		private var total:uint;
 		
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		//
@@ -67,13 +76,17 @@ package songs.bmses
 		
 		public function get directory():File { return _directory; }
 		
-		private var _processingFiles:Vector.<File>;
+		private var _collectedFiles:Vector.<File>;
 		
-		public function get processingFiles():Vector.<File> { return _processingFiles; }
+		public function get processingFiles():Vector.<File> { return _collectedFiles; }
 		
-		private var _completedFiles:Vector.<File>;
+		private var _loadedFiles:Vector.<File>;
 		
-		public function get completedFiles():Vector.<File> { return _completedFiles; }
+		public function get loadedFiles():Vector.<File> { return _loadedFiles; }
+		
+		private var _parsedFiles:Vector.<File>;
+		
+		public function get completedFiles():Vector.<File> { return _parsedFiles; }
 		
 		private var _failedEvents:Vector.<IOErrorEvent>;
 		
@@ -86,66 +99,113 @@ package songs.bmses
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		
 		/**
-		 * 加载文件夹内所有 BMS。
+		 * 初始化，收集所有在 BMSPack 文件夹根目录的 bms 文件。
 		 */
-		public function load():void
+		public function collectAll():void
 		{
 			_bmses 				= new <BMS>[];
-			_processingFiles	= new <File>[];
-			_completedFiles		= new <File>[];
+			_collectedFiles		= new <File>[];
+			_loadedFiles		= new <File>[];
+			_parsedFiles		= new <File>[];
 			_failedEvents		= new <IOErrorEvent>[];
 			
-			_directory.addEventListener(FileListEvent.DIRECTORY_LISTING, directory_listingHandler);
+			_directory.addEventListener(FileListEvent.DIRECTORY_LISTING, collect);
 			_directory.getDirectoryListingAsync();
-		}
-		
-		private function directory_listingHandler(event:FileListEvent):void
-		{
-			var files:Array = event.files;
-			for each (var file:File in files) 
+			
+			function collect(event:FileListEvent):void
 			{
-				if (!BMS.isBMS(file))
-					continue;
+				const files:Array = event.files;
+				for each (var file:File in files) 
+				{
+					if (!BMS.isBMS(file))
+						continue;
+					
+					trace("BMSPack.directory_directoryListingHandler(event) : ",
+						file.name);
+					_collectedFiles.push(file);
+					
+					dispatchEvent(new BMSEvent(BMSEvent.COLLECTING, file.name));
+				}
 				
-				trace("BMSPack.directory_directoryListingHandler(event) : ",
-					file.name);
-				_processingFiles.push(file);
-				file.addEventListener(Event.COMPLETE, file_completeHandler);
-				file.addEventListener(IOErrorEvent.IO_ERROR, file_IoErrorHandler);
-				file.load();
+				total = _collectedFiles.length;
+				dispatchEvent(new BMSEvent(BMSEvent.COLLECTED, null, total, total));
 			}
 		}
 		
-		private function file_completeHandler(event:Event):void
+		/**
+		 * 加载所有收集到的 BMS。
+		 */
+		public function loadAll():void
 		{
-			trace('file loaded');
-			var file:File = event.currentTarget as File;
-			file.removeEventListener(Event.COMPLETE, arguments.callee);
+			const len:uint = _collectedFiles.length;
+			for (var i:int = 0; i < len; i++) 
+			{
+				var file:File = _collectedFiles[i];
+				
+				file.addEventListener(Event.COMPLETE, onComplete);
+				file.addEventListener(IOErrorEvent.IO_ERROR, OnIoError);
+				file.load();
+			}
 			
-			// TODO: 选择转什么码，自动转码。
-			var bms:BMS = new BMS(this);
+			// TODO: 不管成功失败，都完成了，然后再触发 loaded。
+			function onComplete(event:Event):void
+			{
+				const file:File = event.currentTarget as File;
+				file.removeEventListener(Event.COMPLETE, arguments.callee);
+				
+				_loadedFiles.push(file);
+				
+				if (_loadedFiles.length == _collectedFiles.length)
+					dispatchEvent(new BMSEvent(BMSEvent.LOADED, null,
+						_loadedFiles.length, _collectedFiles.length));
+				else
+					dispatchEvent(new BMSEvent(BMSEvent.LOADING, file.name,
+						_loadedFiles.length, _collectedFiles.length));
+			}
+		}
+		
+		/**
+		 * 解析 bms，这儿开始就是同步的了，可能会卡 UI。
+		 */
+		public function parseAll():void
+		{
+			for each (var file:File in _loadedFiles) // 如果有没 load 成功的，重试/忽略。
+			{
+				parse(file);
+			}
+		}
+		
+		private function parse(file:File):void
+		{
+			const bms:BMS = new BMS(this);
 			bms.name = FileReferenceUtil.getBaseName(file);
 			bms.extension = file.extension;
 			bms.setData(file.data, Main.current.encoding);
-			bms.load();
+			bms.parse();
 			_bmses.push(bms);
 //			trace('loadComplete');
 			
-			_processingFiles.splice(_processingFiles.indexOf(file), 1);
-			_completedFiles.push(file);
-			if (_processingFiles.length === 0)
+			_parsedFiles.push(file);
+			if (_parsedFiles.length == _loadedFiles.length)
+			{
 				matchName();
-			dispatchEvent(event);
+				dispatchEvent(new BMSEvent(BMSEvent.PARSED, null, total, total));
+			}
+			
+			dispatchEvent(new BMSEvent(BMSEvent.PARSING, file.name, _parsedFiles.length, total));
 		}
 		
 		
-		private function file_IoErrorHandler(event:IOErrorEvent):void
+		private function OnIoError(event:IOErrorEvent):void
 		{
-			_processingFiles.splice(_processingFiles.indexOf(event.target), 1);
-			_failedEvents.push(event);
+			_failedEvents.push(event); // 这个是干吗用的？
+			
 			dispatchEvent(event);
 		}
 		
+		/**
+		 * 匹配出难度名。
+		 */
 		private function matchName():void
 		{
 			// TODO: 根据匹配出的难度名猜测是否为难度名。

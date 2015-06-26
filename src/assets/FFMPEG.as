@@ -2,9 +2,19 @@ package assets
 {
 	import flash.desktop.NativeProcess;
 	import flash.desktop.NativeProcessStartupInfo;
+	import flash.events.ErrorEvent;
+	import flash.events.Event;
+	import flash.events.NativeProcessExitEvent;
 	import flash.events.ProgressEvent;
 	import flash.filesystem.File;
 
+	//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
+	//  Events
+	//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
+	
+	[Event(name="complete", type="flash.events.Event")]
+	[Event(name="error", type="flash.events.ErrorEvent")]
+	
 	/**
 	 * ffmpeg 封装成转换视频格式的类。
 	 * 
@@ -66,8 +76,14 @@ package assets
 				'-i', src, dst
 			];
 			
+			// 如果目标的目录没有创建，就无法转换，所以得先创建目录。
+			const dstDir:File = new File(dst).resolvePath('..');
+			if (!dstDir.exists)
+				dstDir.createDirectory();
+			
 			stdout = '';
 			addEventListener(ProgressEvent.STANDARD_ERROR_DATA, onErrorData);
+			addEventListener(NativeProcessExitEvent.EXIT, onExit);
 			start(info);
 		}
 		
@@ -80,7 +96,7 @@ package assets
 		/**
 		 * 它只 error，什么鬼东西。
 		 */
-		public function onErrorData(event:ProgressEvent):void
+		private function onErrorData(event:ProgressEvent):void
 		{
 			const newStdout:String = standardError.readUTFBytes(standardError.bytesAvailable);
 			stdout += newStdout;
@@ -91,6 +107,16 @@ package assets
 				standardInput.writeUTFBytes('y\n');
 				removeEventListener(ProgressEvent.STANDARD_ERROR_DATA, arguments.callee);
 			}
+		}
+		
+		private function onExit(event:NativeProcessExitEvent):void
+		{
+			removeEventListener(NativeProcessExitEvent.EXIT, arguments.callee);
+			
+			if (event.exitCode == 0)
+				dispatchEvent(new Event(Event.COMPLETE));
+			else
+				dispatchEvent(new ErrorEvent(ErrorEvent.ERROR));
 		}
 	}
 }

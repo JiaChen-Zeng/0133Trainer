@@ -76,6 +76,7 @@ package songs.bmses
 		//
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		
+		// TODO: 不是根据后缀名而是根据能否解析其中的文本判断是否是 bms 文件。
 		public static function isBMS(file:File):Boolean
 		{
 			var extension:String = file.extension;
@@ -230,10 +231,10 @@ package songs.bmses
 			this.content = data.readMultiByte(data.bytesAvailable, encoding);
 		}
 		
-		public function load():void
+		public function parse():void
 		{
 			parser ||= new BMSParser(this);
-			parser.load();
+			parser.parse();
 		}
 		
 		internal function init():void

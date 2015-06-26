@@ -43,7 +43,7 @@ package songs.bmses
 		//
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		
-		internal function load():void
+		internal function parse():void
 		{
 			bms.init();
 			
@@ -78,7 +78,7 @@ package songs.bmses
 					trace('this[' + key.toLowerCase()+ '] = ' + value + ';');
 					return;
 				}
-				else (attr == 'inobj')
+				else if (attr == 'inobj')
 				{
 					bms.lnobj = value;
 					trace('this[' + key.toLowerCase()+ '] = ' + value + ';');
@@ -105,6 +105,7 @@ package songs.bmses
 			catch(error:Error) 
 			{
 				// TODO: 忽略|取消。
+				// 模糊匹配写错了的属性。
 				throw error;
 			}
 			

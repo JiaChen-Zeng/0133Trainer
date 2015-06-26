@@ -62,7 +62,11 @@
 			
 			private var file:File = new File();
 			private var files:Vector.<File> = new <File>[];
-			private var processingBMSPacks:Vector.<BMSPack> = new <BMSPack>[];
+			
+			private var processingBMSPackIndex:uint;
+			
+			private var bmsPacks:Vector.<BMSPack>;
+			private var collectedBMSPacks:Vector.<BMSPack>;
 			
 			//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 			//  Application
@@ -91,7 +95,7 @@
 			
 			protected function convertBtn_clickHandler(event:MouseEvent):void
 			{
-				collectAll();
+				collectBMSPacks();
 			}
 			
 		]]>
@@ -99,6 +103,7 @@
 	
 	<fx:Script aoi:section="model">
 		<![CDATA[
+			import events.BMSEvent;
 			
 			protected function bmsDir_selectHandler(event:Event):void
 			{
@@ -117,14 +122,15 @@
 			/**
 			 * 异步收集所有内含 BMS 的文件夹，一检测到（它里面含有 BMS）就返回，
 			 * 创建对应的 BMSPack，最后收集完毕调用 loadAll()。
-			 * @see #loadAll()
 			 * @see #walkDirectoryAsync()
 			 */
-			protected function collectAll():void
+			protected function collectBMSPacks():void
 			{
-				processingBMSPacks = new <BMSPack>[];
+				bmsPacks = new <BMSPack>[];
+				collectedBMSPacks = new <BMSPack>[];
+				
 				const bmsDir:File = new File(bmsDirStr);
-				walkDirectoryAsync(bmsDir, walkFunc, loadAll, false);
+				walkDirectoryAsync(bmsDir, walkFunc, collectBMSes, false);
 				
 				function walkFunc(file:File, dir:File):Boolean
 				{
@@ -132,50 +138,118 @@
 					const extension:String = file.extension;
 					if (file.isDirectory === false && BMS.isBMS(file))
 					{
-						processingBMSPacks.push(new BMSPack(dir));
+						bmsPacks.push(new BMSPack(dir));
 						return true;
 					}
 					
 					return false;
 				}
+				
+				function collectBMSes():void
+				{
+					for each (var bmsPack:BMSPack in bmsPacks) 
+					{
+						bmsPack.addEventListener(BMSEvent.COLLECTED, bmspack_collectedHandler);
+						bmsPack.addEventListener(IOErrorEvent.IO_ERROR, bmsPack_IoErrorHandler);
+						bmsPack.collectAll();
+					}
+				}
+				
+				/**
+				 * 等到全部 bmsPack 都收集完毕了，就一个一个开始转换。
+				 */
+				function bmspack_collectedHandler(event:BMSEvent):void
+				{
+					const bmsPack:BMSPack= event.currentTarget as BMSPack;
+					
+					bmsPack.removeEventListener(BMSEvent.COLLECTED, arguments.callee);
+					
+					collectedBMSPacks.push(bmsPack);
+					
+					if (collectedBMSPacks.length == bmsPacks.length)
+					{
+						processingBMSPackIndex = 0;
+						loadBMSPack();
+					}
+				}
 			}
 			
-			/**
-			 * 所有搜集到的 bmsPack。
-			 * @see #collectAll()
-			 * @see #bmsPack_completeHandler()
-			 */
-			protected function loadAll():void
+			protected function loadBMSPack():void
 			{
-				for each (var bmsPack:BMSPack in processingBMSPacks) 
-				{
-					bmsPack.addEventListener(Event.COMPLETE, bmsPack_completeHandler);
-					bmsPack.addEventListener(IOErrorEvent.IO_ERROR, bmsPack_IoErrorHandler);
-					bmsPack.load();
-				}
+				trace("Main.loadBMSPack()");
+				const bmsPack:BMSPack = bmsPacks[processingBMSPackIndex];
+				bmsPack.addEventListener(BMSEvent.LOADED, parseBMSPack);
+				bmsPack.loadAll();
+			}
+			
+			protected function parseBMSPack(event:BMSEvent):void
+			{
+				trace("Main.parseBMSPack(event)");
+				const bmsPack:BMSPack = event.currentTarget as BMSPack;
+				bmsPack.removeEventListener(BMSEvent.LOADED, arguments.callee);
+				bmsPack.addEventListener(BMSEvent.PARSED, convertBMSPack);
+				bmsPack.parseAll();
 			}
 			
 			/**
 			 * 转换 BMSPack。
-			 * @see #loadAll()
 			 */
-			protected function bmsPack_completeHandler(event:Event):void
+			protected function convertBMSPack(event:BMSEvent):void
 			{
-				var bmsPack:BMSPack = event.target as BMSPack;
-				if (bmsPack.processingFiles.length !== 0)
-					return;
+				trace("Main.convertBMSPack(event)");
+				const bmsPack:BMSPack = event.currentTarget as BMSPack;
 				
-				var converter:BMS2OSUConverter = new BMS2OSUConverter(bmsPack);
-				var beatmap:Beatmap = converter.convert();
+				bmsPack.removeEventListener(BMSEvent.LOADED, arguments.callee);
 				
-				var outputDir:File = new File(outputDirStr);
+				// 转换。
+				const converter:BMS2OSUConverter = new BMS2OSUConverter(bmsPack);
+				const beatmap:Beatmap = converter.convert();
+				beatmap.collectResources();
+				
+				// 设置输出文件夹。
+				const outputDir:File = new File(outputDirStr);
+				
+				// 根据当前正在处理的 bmsPack 索引判断是应该继续处理下一个还是处理完成了。
+				const listener:Function = processingBMSPackIndex != bmsPacks.length - 1 ?
+					nextBMSPack : complete;
+				beatmap.addEventListener(Event.COMPLETE, listener);
+				beatmap.addEventListener(IOErrorEvent.IO_ERROR, onIoError);
+				beatmap.addEventListener(ErrorEvent.ERROR, onError);
+				
+				// 保存到输出文件夹。
 				beatmap.saveAsync(outputDir);
+				
+				function nextBMSPack(event:Event):void
+				{
+					beatmap.removeEventListener(Event.COMPLETE, arguments.callee);
+					
+					processingBMSPackIndex++;
+					loadBMSPack();
+				}
+				
+				function onIoError(event:IOErrorEvent):void
+				{
+					trace(event.toString());
+				}
+				
+				function onError(event:ErrorEvent):void
+				{
+					trace(event.toString());
+				}
+			}
+			
+			private function complete(event:Event):void
+			{
+				const beatmap:Beatmap = event.currentTarget as Beatmap;
+				
+				beatmap.removeEventListener(Event.COMPLETE, arguments.callee);
+				
 				trace('Complete: ' + beatmap.name + ' !');
 			}
 			
 			protected function bmsPack_IoErrorHandler(event:IOErrorEvent):void
 			{
-				
+				trace(event.toString());
 			}
 			
 			/**
@@ -202,6 +276,7 @@
 													  completeFunc:Function,
 													  isRootOnly:Boolean = false):void
 			{
+			
 				const walkingDirs:Vector.<File> = new <File>[];
 				
 				directory.addEventListener(FileListEvent.DIRECTORY_LISTING, directory_listingHandler);
@@ -235,6 +310,7 @@
 			
 			// TODO: 把选择编码UI补上。还有去BMS2OSUConverter里把+1K的判断搞下，再来这补UI。
 			// TODO: 异步处理 BMS，显示进度。还有自动搜寻 zip 里的 BMS。 
+			
 		]]>
 	</fx:Script>
 	
