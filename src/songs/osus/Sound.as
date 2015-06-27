@@ -52,6 +52,18 @@ package songs.osus
 			return StringUtil.substitute('{0},{1},{2},"{3}",{4}',
 				sample, offset, layer, file || '', volume);
 		}
+		
+		public function clone():Sound
+		{
+			const sound:Sound = new Sound();
+			sound.sample = sample;
+			sound.offset = offset;
+			sound.layer = layer;
+			sound.file = file;
+			sound.volume = volume;
+			
+			return sound;
+		}
 	}
 }
 

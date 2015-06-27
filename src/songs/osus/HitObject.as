@@ -1,5 +1,7 @@
 package songs.osus
 {
+	import flash.errors.IllegalOperationError;
+	
 	import songs.bmses.Data;
 
 	public class HitObject

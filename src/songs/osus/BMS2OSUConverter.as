@@ -1,5 +1,8 @@
 package songs.osus
 {
+	import flash.net.registerClassAlias;
+	import flash.utils.ByteArray;
+	
 	import mx.utils.StringUtil;
 	
 	import songs.bmses.BMS;
@@ -7,7 +10,7 @@ package songs.osus
 	import songs.bmses.Data;
 	import songs.bmses.IBMS;
 	
-	public final class BMS2OSUConverter
+	public final class BMS2OSUConverter/* implements IExternalizable*/
 	{
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		//
@@ -203,7 +206,6 @@ package songs.osus
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		//  Converts
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
-
 		
 		public function convert(specialStyle:uint = 1):Beatmap
 		{
@@ -859,7 +861,7 @@ package songs.osus
 			// 简单地十位数用玩家索引，个位数用轨道。
 			// 等会只会计算有几个元素所以是没问题的。
 			keyCounter[player * 10 + lane] = true;
-			if (lane === 0 && bms.extension != 'pms')
+			if (lane == 0 && bms.extension != 'pms')
 				haveScratch = true;
 		}
 		
@@ -997,6 +999,7 @@ package songs.osus
 				&& data.content !== 0;
 		}
 		
+		registerClassAlias('songs.osus.OSU', OSU);
 		/**
 		 * 好帅的名字。
 		 * 这里面设置依赖于 Key Count 的东西。
@@ -1005,9 +1008,8 @@ package songs.osus
 		{
 			// TODO: 按用户设置，是否清除默认音效。
 			// 7k 很可能是 o2mania 的谱，去掉的是第七键。
-			const hitObjects:Vector.<HitObject> = osu.hitObjects;
 			var doRemapHitObjects:Boolean =
-				Main.current.addNoScratch === '是' && haveScratch && osu.kc !== 7;
+				Main.current.addNoScratch == '是' && haveScratch && osu.kc == 8;
 //			trace('============================================');
 //			trace('|                                          |');
 //			trace('|             doRemapHitObjects:           |');
@@ -1020,52 +1022,86 @@ package songs.osus
 //			trace('|            ' + bms.name + '                    |');
 //			trace('============================================');
 			
+			clearSounds();
+			
+			// 生成无皿谱。
 			if (doRemapHitObjects)
 			{
-				osu.kc -= bms.player === 1 ?
-					1 : 2;
+				const noScratchOSU:OSU = osu.clone();
 				
-				var i:uint = 0;
-				while (i < hitObjects.length)
-				{
-					// 如果没删除物件，则下一个索引。
-					if (!remapHitObject(hitObjects[i]))
-						i++;
-				}
+				removeScratch(noScratchOSU);
+				setNotePositions(noScratchOSU);
+				beatmap.addOSU(noScratchOSU);
 			}
 			
-			const keyCount:uint = osu.kc;
+			setNotePositions(osu);
+		}
+		
+		private function clearSounds():void 
+		{
+			// 清除默认音效。
 			for each (var obj:HitObject in osu.hitObjects) 
 			{
-				obj.setPosition(keyCount);
-				
-				// 清除默认音效。
 				if (haveKeySound)
 					obj.sound ||= 'clear';
 			}
 		}
 		
-		/**
-		 * 移除皿，并把轨道对应好。
-		 * @return 表示是否移除了 HitObject。
-		 */
-		private function remapHitObject(object:HitObject):Boolean
+		private function setNotePositions(osu:OSU):void
 		{
-			const hitObjects:Vector.<HitObject> = osu.hitObjects;
-			const player:uint = object.player;
-			
-			if (object.lane === 0)
+			// 这里的 osu 是参数的 osu 而不是字段的 osu。
+			// 为了 noScratchOSU 也可以复用。
+			const keyCount:uint = osu.kc;
+			for each (var obj:HitObject in osu.hitObjects) 
 			{
-				// TODO: 音效加到 sb 中。
-				hitObjects.splice(hitObjects.indexOf(object), 1);
-				return true;
+				obj.setPosition(keyCount);
+			}
+		}
+		
+		private function removeScratch(noScratchOSU:OSU):void
+		{
+			haveScratch = false;
+			noScratchOSU.kc -= 1;
+			noScratchOSU.name = noScratchOSU.name = bms.name + '↓.' + bms.extension;
+			noScratchOSU.version += '↓';
+			
+			const hitObjects:Vector.<HitObject> = noScratchOSU.hitObjects;
+			
+			var i:uint = 0;
+			while (i < hitObjects.length)
+			{
+				// 如果没删除物件，则下一个索引。
+				if (!remapHitObject(hitObjects[i]))
+					i++;
 			}
 			
-			// 只要把玩家1的轨道全部向前移一位即可，玩家2的皿的最右边。
-			if (player === 0)
+			/**
+			 * 移除皿，并把轨道对应好。
+			 * @return 表示是否移除了 HitObject。
+			 */
+			function remapHitObject(object:HitObject):Boolean
+			{
+				const hitObjects:Vector.<HitObject> = noScratchOSU.hitObjects;
+				const player:uint = object.player;
+				
+				if (object.lane == 0)
+				{
+					hitObjects.splice(hitObjects.indexOf(object), 1);
+					
+					const sound:Sound = new Sound();
+					sound.offset = object.offset;
+					sound.file = object.sound;
+					
+					noScratchOSU.sounds.push(sound);
+					return true;
+				}
+				
+				// 只要把玩家1的轨道全部向前移一位即可，玩家2的皿的最右边。
+//				if (player == 0)
 				object.lane--;
-			
-			return false;
+				
+				return false;
+			}
 		}
 		
 		private function setKeyCount():void
@@ -1187,6 +1223,35 @@ package songs.osus
 		{
 			return RE_VIDEO.test(name);
 		}
+		
+		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
+		//  IExternalizable
+		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
+		
+//		public function writeExternal(output:IDataOutput):void
+//		{
+//			output.writeObject(bms);
+//			output.writeObject(iBMS);
+//			output.writeObject(osu);
+//			output.writeObject(beatmap);
+//			output.writeObject(keyCounter);
+//			output.writeObject(haveKeySound);
+//			output.writeObject(haveScratch);
+//			output.writeObject();
+//			output.writeObject();
+//			output.writeObject();
+//			output.writeObject();
+//			output.writeObject();
+//			output.writeObject();
+//			output.writeObject();
+//			output.writeObject();
+//			output.writeObject();
+//		}
+//		
+//		public function readExternal(input:IDataInput):void
+//		{
+//			
+//		}
 	}
 }
 

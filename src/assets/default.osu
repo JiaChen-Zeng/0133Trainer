@@ -1,5 +1,7 @@
 osu file format v14
 
+// Converted by 0133Trainer
+
 [General]
 AudioFilename: virtual
 AudioLeadIn: 0

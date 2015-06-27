@@ -42,6 +42,29 @@ package songs.osus
 			return StringUtil.substitute('{0},{1},{2},{3},{4},{5}:{6}:{7}:{8}:{9}:{10}',
 				x, y, offset, objectFlag, osuSound, offset2, osuSoundType, osuCustomSound, unknown, volume, sound || '');
 		}
+		
+		public function clone():LongNote
+		{
+			const ln:LongNote = new LongNote(data);
+			ln.lane = lane;
+			ln.player = player;
+			ln.x = x;
+			ln.y = y;
+			ln.offset = offset;
+			ln.objectFlag = objectFlag;
+			ln.osuSound = osuSound;
+			ln.osuSoundType = osuSoundType;
+			ln.osuCustomSound = osuCustomSound;
+			ln.unknown = unknown;
+			ln.volume = volume;
+			ln.sound = sound;
+			ln.data = data;
+			
+			ln.data2 = data2;
+			ln.offset2 = offset2;
+			
+			return ln;
+		}
 	}
 }
 

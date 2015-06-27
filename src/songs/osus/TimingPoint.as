@@ -97,6 +97,21 @@ package songs.osus
 			return StringUtil.substitute('{0},{1},{2},{3},{4},{5},{6},{7}',
 				offset, time, meter, sample, sampleSet, volume, type, kiai);
 		}
+		
+		public function clone():TimingPoint
+		{
+			const tp:TimingPoint = new TimingPoint();
+			tp.offset = offset;
+			tp.time = time;
+			tp.meter = meter;
+			tp.sample = sample;
+			tp.sampleSet = sampleSet;
+			tp.volume = volume;
+			tp.type = type;
+			tp.kiai = kiai;
+			
+			return tp;
+		}
 	}
 }
 
