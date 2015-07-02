@@ -21,7 +21,9 @@
     </application>
   </applications>
   <modules/>
-  <workers/>
+  <workers managerFilePath="src/Workers.as">
+    <worker embed="true" path="src/BackgroundWorker.as"/>
+  </workers>
   <buildCSSFiles/>
   <flashCatalyst validateFlashCatalystCompatibility="false"/>
   <buildTargets>
@@ -29,6 +31,10 @@
       <airSettings airCertificatePath="" airTimestamp="true" anePathSet="false" version="1">
         <airExcludes/>
         <anePaths/>
+        <newLaunchParams/>
+        <modifiedLaunchParams/>
+        <newPackagingParams/>
+        <modifiedPackagingParams/>
       </airSettings>
       <actionScriptSettings version="1"/>
     </buildTarget>

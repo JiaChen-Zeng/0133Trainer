@@ -10,6 +10,8 @@ package songs.bmses
 	
 	import events.BMSEvent;
 	
+	import models.Config;
+	
 	import moe.aoi.utils.FileReferenceUtil;
 
 	//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
@@ -45,9 +47,10 @@ package songs.bmses
 		//
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		
-		public function BMSPack(directory:File = null)
+		public function BMSPack(directory:File, config:Config)
 		{
 			_directory = directory;
+			this.config = config;
 		}
 		
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
@@ -55,6 +58,8 @@ package songs.bmses
 		//  Variables
 		//
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
+		
+		private var config:Config;
 		
 		private var total:uint;
 		
@@ -114,6 +119,8 @@ package songs.bmses
 			
 			function collect(event:FileListEvent):void
 			{
+				dispatchEvent(new BMSEvent(BMSEvent.COLLECTING, null, _collectedFiles.length));
+				
 				const files:Array = event.files;
 				for each (var file:File in files) 
 				{
@@ -124,11 +131,11 @@ package songs.bmses
 						file.name);
 					_collectedFiles.push(file);
 					
-					dispatchEvent(new BMSEvent(BMSEvent.COLLECTING, file.name));
+					dispatchEvent(new BMSEvent(BMSEvent.COLLECTING, file.name, _collectedFiles.length));
 				}
 				
 				total = _collectedFiles.length;
-				dispatchEvent(new BMSEvent(BMSEvent.COLLECTED, null, total, total));
+				dispatchEvent(new BMSEvent(BMSEvent.COLLECTED, null, _collectedFiles.length, total));
 			}
 		}
 		
@@ -137,17 +144,18 @@ package songs.bmses
 		 */
 		public function loadAll():void
 		{
+			dispatchEvent(new BMSEvent(BMSEvent.LOADING, null, _loadedFiles.length, total));
+			
 			const len:uint = _collectedFiles.length;
 			for (var i:int = 0; i < len; i++) 
 			{
 				var file:File = _collectedFiles[i];
 				
 				file.addEventListener(Event.COMPLETE, onComplete);
-				file.addEventListener(IOErrorEvent.IO_ERROR, OnIoError);
+				file.addEventListener(IOErrorEvent.IO_ERROR, onIoError);
 				file.load();
 			}
 			
-			// TODO: 不管成功失败，都完成了，然后再触发 loaded。
 			function onComplete(event:Event):void
 			{
 				const file:File = event.currentTarget as File;
@@ -155,12 +163,13 @@ package songs.bmses
 				
 				_loadedFiles.push(file);
 				
-				if (_loadedFiles.length == _collectedFiles.length)
+				// TODO: 不管成功失败，都完成了，然后再触发 loaded。
+				if (_loadedFiles.length == total)
 					dispatchEvent(new BMSEvent(BMSEvent.LOADED, null,
-						_loadedFiles.length, _collectedFiles.length));
+						_loadedFiles.length, total));
 				else
 					dispatchEvent(new BMSEvent(BMSEvent.LOADING, file.name,
-						_loadedFiles.length, _collectedFiles.length));
+						_loadedFiles.length, total));
 			}
 		}
 		
@@ -169,6 +178,8 @@ package songs.bmses
 		 */
 		public function parseAll():void
 		{
+			dispatchEvent(new BMSEvent(BMSEvent.PARSING, null, _parsedFiles.length, _loadedFiles.length));
+			
 			for each (var file:File in _loadedFiles) // 如果有没 load 成功的，重试/忽略。
 			{
 				parse(file);
@@ -180,7 +191,7 @@ package songs.bmses
 			const bms:BMS = new BMS(this);
 			bms.name = FileReferenceUtil.getBaseName(file);
 			bms.extension = file.extension;
-			bms.setData(file.data, Main.current.encoding);
+			bms.setData(file.data, config.encoding);
 			bms.parse();
 			_bmses.push(bms);
 //			trace('loadComplete');
@@ -189,14 +200,14 @@ package songs.bmses
 			if (_parsedFiles.length == _loadedFiles.length)
 			{
 				matchName();
-				dispatchEvent(new BMSEvent(BMSEvent.PARSED, null, total, total));
+				dispatchEvent(new BMSEvent(BMSEvent.PARSED, null, _parsedFiles.length, _loadedFiles.length));
 			}
 			
-			dispatchEvent(new BMSEvent(BMSEvent.PARSING, file.name, _parsedFiles.length, total));
+			dispatchEvent(new BMSEvent(BMSEvent.PARSING, file.name, _parsedFiles.length, _loadedFiles.length));
 		}
 		
 		
-		private function OnIoError(event:IOErrorEvent):void
+		private function onIoError(event:IOErrorEvent):void
 		{
 			_failedEvents.push(event); // 这个是干吗用的？
 			

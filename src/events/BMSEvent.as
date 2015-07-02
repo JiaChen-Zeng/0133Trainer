@@ -16,6 +16,12 @@ package events
 		
 		public static const PARSED:String		= 'parsed';
 		
+		public static const COPYING_OSU:String	= 'copying_osu';
+		
+		public static const COPYING_WAV:String	= 'copying_wav';
+		
+		public static const COPYING_BMP:String	= 'copying_bmp';
+		
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		//
 		//  Constructor
@@ -43,15 +49,14 @@ package events
 		public function get res():String { return _res; }
 		
 		/** 当前的进度。 */
-		private var _value:Number;
+		private var _value:Number = NaN;
 
 		public function get value():Number { return _value; }
 		
 		/** 总进度。 */
-		private var _total:Number;
+		private var _total:Number = NaN;
 		
 		public function get total():Number { return _total; }
-		
 	}
 }
 

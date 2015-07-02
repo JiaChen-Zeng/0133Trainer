@@ -1,16 +1,15 @@
 package songs.osus
 {
-	import flash.net.registerClassAlias;
-	import flash.utils.ByteArray;
-	
 	import mx.utils.StringUtil;
+	
+	import models.Config;
 	
 	import songs.bmses.BMS;
 	import songs.bmses.BMSPack;
 	import songs.bmses.Data;
 	import songs.bmses.IBMS;
 	
-	public final class BMS2OSUConverter/* implements IExternalizable*/
+	public final class BMS2OSUConverter
 	{
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		//
@@ -93,7 +92,7 @@ package songs.osus
 		
 		private static const RE_VIDEO:RegExp = /\.(avi|mpg|mpeg)$/i;
 		
-		public static const FORMAT_CONVERT:String = '.flv';
+		public static const FORMAT_CONVERT:String = '.mp4';
 		
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		//
@@ -116,8 +115,9 @@ package songs.osus
 		//
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		
-		public function BMS2OSUConverter(iBMS:IBMS)
+		public function BMS2OSUConverter(config:Config, iBMS:IBMS)
 		{
+			this.config = config;
 			this.iBMS = iBMS;
 		}
 		
@@ -126,6 +126,8 @@ package songs.osus
 		//  Variables
 		//
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
+		
+		private var config:Config;
 		
 		private var bms:BMS;
 		
@@ -261,8 +263,8 @@ package songs.osus
 			if (res.version)
 				osu.version += ' ' + res.version;
 			// TODO: 根据 rank total 设置 HP 和 OD。
-			osu.od = Main.current.OD;
-			osu.hp = Main.current.HP;
+			osu.od = config.OD;
+			osu.hp = config.HP;
 			// TODO: 如果没有 stageFile 的话就取第一个出现的 04 通道的 BMP。话说 BMS 的图片都这么小……？
 			if (bms.stagefile)
 				osu.background = PREFIX_BMP_FILE + bms.stagefile;
@@ -999,7 +1001,6 @@ package songs.osus
 				&& data.content !== 0;
 		}
 		
-		registerClassAlias('songs.osus.OSU', OSU);
 		/**
 		 * 好帅的名字。
 		 * 这里面设置依赖于 Key Count 的东西。
@@ -1009,7 +1010,7 @@ package songs.osus
 			// TODO: 按用户设置，是否清除默认音效。
 			// 7k 很可能是 o2mania 的谱，去掉的是第七键。
 			var doRemapHitObjects:Boolean =
-				Main.current.addNoScratch == '是' && haveScratch && osu.kc == 8;
+				config.addNoScratch == '是' && haveScratch && osu.kc == 8;
 //			trace('============================================');
 //			trace('|                                          |');
 //			trace('|             doRemapHitObjects:           |');

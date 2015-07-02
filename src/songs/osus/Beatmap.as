@@ -14,6 +14,8 @@ package songs.osus
 	
 	import assets.FFMPEG;
 	
+	import events.BMSEvent;
+	
 	import moe.aoi.utils.FileReferenceUtil;
 	
 	import songs.bmses.BMS;
@@ -23,7 +25,9 @@ package songs.osus
 	//  Events
 	//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 	
-	[Event(name="progress", type="flash.events.Event")]
+	[Event(name="copying_osu", type="events.BMSEvent")]
+	[Event(name="copying_wav", type="events.BMSEvent")]
+	[Event(name="copying_bmp", type="events.BMSEvent")]
 	[Event(name="complete", type="flash.events.Event")]
 	[Event(name="ioError", type="flash.events.IOErrorEvent")]
 	[Event(name="error", type="flash.events.ErrorEvent")]
@@ -115,6 +119,7 @@ package songs.osus
 			directory = ba.readObject();
 			
 			index = 0;
+			dispatchEvent(new BMSEvent(BMSEvent.COPYING_OSU, null, index, osues.length));
 			saveOSUAsync();
 		}
 		
@@ -155,9 +160,10 @@ package songs.osus
 				tempFile.removeEventListener(Event.COMPLETE, arguments.callee);
 				tempFile.removeEventListener(IOErrorEvent.IO_ERROR, OnIoError);
 				tempFile.deleteFileAsync();
-				dispatchEvent(new Event(ProgressEvent.PROGRESS));
 				
 				index++;
+				dispatchEvent(new BMSEvent(BMSEvent.COPYING_OSU, dst.name, index, osues.length));
+				
 				saveOSUAsync();
 			}
 			
@@ -167,7 +173,11 @@ package songs.osus
 				tempFile.removeEventListener(IOErrorEvent.IO_ERROR, OnIoError);
 				tempFile.deleteFileAsync();
 				
+				index++;
+				dispatchEvent(new BMSEvent(BMSEvent.COPYING_OSU, dst.name, index, osues.length));
+				
 				index = 0;
+				dispatchEvent(new BMSEvent(BMSEvent.COPYING_WAV, null, index, wavs.length));
 				saveWav();
 			}
 			
@@ -224,14 +234,21 @@ package songs.osus
 				dispatchEvent(new Event(ProgressEvent.PROGRESS));
 				
 				index++;
+				dispatchEvent(new BMSEvent(BMSEvent.COPYING_WAV, dst.name, index, wavs.length));
+				
 				saveWav();
 			}
 			
 			function nextPhase(event:Event = null):void
 			{
 				file.removeEventListener(Event.COMPLETE, arguments.callee);
+				file.removeEventListener(IOErrorEvent.IO_ERROR, OnIoError);
+				
+				index++;
+				dispatchEvent(new BMSEvent(BMSEvent.COPYING_WAV, dst.name, index, wavs.length));
 				
 				index = 0;
+				dispatchEvent(new BMSEvent(BMSEvent.COPYING_BMP, null, index, bmps.length));
 				saveBmp();
 			}
 			
@@ -307,9 +324,10 @@ package songs.osus
 				file.removeEventListener(Event.COMPLETE, arguments.callee);
 				file.removeEventListener(ErrorEvent.ERROR, onError);
 				file.removeEventListener(IOErrorEvent.IO_ERROR, OnIoError);
-				dispatchEvent(new Event(ProgressEvent.PROGRESS));
 				
 				index++;
+				dispatchEvent(new BMSEvent(BMSEvent.COPYING_BMP, dst.name, index, bmps.length));
+				
 				saveBmp();
 			}
 			
@@ -318,6 +336,9 @@ package songs.osus
 				file.removeEventListener(Event.COMPLETE, arguments.callee);
 				file.removeEventListener(ErrorEvent.ERROR, onError);
 				file.removeEventListener(IOErrorEvent.IO_ERROR, OnIoError);
+				
+				index++;
+				dispatchEvent(new BMSEvent(BMSEvent.COPYING_BMP, dst.name, index, bmps.length));
 				
 				dispatchEvent(event || new Event(Event.COMPLETE));
 			}

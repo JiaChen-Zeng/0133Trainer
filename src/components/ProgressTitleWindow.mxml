@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			   xmlns:s="library://ns.adobe.com/flex/spark" 
+			   xmlns:mx="library://ns.adobe.com/flex/mx"
+			   width="400" height="300">
+	
+	<fx:Script>
+		<![CDATA[
+			
+			[Bindable]
+			private var bmsPack:String;
+			
+			[Bindable]
+			private var res:String;
+			[Bindable]
+			private var value:uint;
+			[Bindable]
+			private var total:uint;
+			
+			public function setBMSPackProgress(bmsPack:String, value:uint, total:uint):void
+			{
+				this.bmsPack = bmsPack;
+				bmsPackProgressBar.setProgress(value, total);
+			}
+			
+			public function setBMSProgress(state:String, res:String, value:uint, total:uint):void
+			{
+				this.res = res || '';
+				this.value = value;
+				this.total = total;
+				
+				currentState = state;
+				
+				bmsProgressBar.setProgress(value, total);
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<s:states>
+		<s:State name="collecting_bmsPacks"/>
+		<s:State name="collecting"		stateGroups="converting_bmsPacks"/>
+		<s:State name="loading"			stateGroups="converting_bmsPacks"/>
+		<s:State name="parsing"			stateGroups="converting_bmsPacks"/>
+		<s:State name="arranging"		stateGroups="converting_bmsPacks"/>
+		<s:State name="copying_osu"		stateGroups="converting_bmsPacks"/>
+		<s:State name="copying_wav"		stateGroups="converting_bmsPacks"/>
+		<s:State name="copying_bmp"		stateGroups="converting_bmsPacks"/>
+	</s:states>
+	
+	<s:layout>
+		<s:VerticalLayout/>
+	</s:layout>
+	
+	<mx:ProgressBar id="bmsPackProgressBar"
+					label.collecting_bmsPacks="收集 BMS 文件夹"
+					label.converting_bmsPacks="{'转换 BMS 文件夹: ' + bmsPack}"
+					mode="manual"/>
+	
+	<mx:ProgressBar id="bmsProgressBar"
+					label.collecting_bmsPacks	= "'等待中"
+					label.collecting			= "{'收集 BMS: '		+ res}"
+					label.loading				= "{'加载 BMS: '		+ res}"
+					label.parsing				= "{'解析 BMS: '		+ res}"
+					label.arranging				= "{'整理资源文件: '	+ res}"
+					label.copying_osu			= "{'复制 OSU: '		+ res}"
+					label.copying_wav			= "{'复制 WAV: '		+ res}"
+					label.copying_bmp			= "{'复制 BMP: '		+ res}"
+					mode="manual"/>
+	
+</s:TitleWindow>
+

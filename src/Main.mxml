@@ -6,16 +6,89 @@
 				xmlns:local="*"
 				
 				title="0133训练机"
-				width="400"
+				width="560"
 				height="360"
 				skinClass="skins.MainSkin"
 				showStatusBar="false"
-				applicationComplete="applicationCompleteHandler(event)">
+				applicationComplete="applicationCompleteHandler(event)" xmlns:components="components.*" xmlns:models="models.*">
 	
 	<fx:Style source="css/Main.css"/>
 	
+	<!---
+		BMS 转换流程
+		1. 收集各个 BMSPack。
+		2. 加载各个 BMSPack。
+		3. 其中，收集各个 BMS。
+		4. 加载各个 BMS，并关联 wav 和 bmp。
+		5. 整理 BMSPack 里关联的 wav 和 bmp。
+		6. 转换各个 BMS。
+		7. 复制各个 wav 和 bmp。
+	-->
+	<fx:Script aoi:section="model">
+		<![CDATA[
+			import flash.net.registerClassAlias;
+			
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
+			import mx.validators.Validator;
+			
+			import spark.components.Alert;
+			
+			import components.ProgressTitleWindow;
+			
+			public static var current:Main;
+			
+			[Embed(source="workerswfs/BackgroundWorker.swf", mimeType="application/octet-stream")]
+			private static const WORKER:Class;
+			
+			private var file:File = new File();
+			
+			private var progressTitleWindow:ProgressTitleWindow = new ProgressTitleWindow();
+			
+			//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
+			//  Worker
+			//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
+
+			private var bWorker:Worker;
+			
+			private var m2bChannel:MessageChannel;
+			private var b2mChannel:MessageChannel;
+			
+			registerClassAlias('components.ProgressTitleWindow', components.ProgressTitleWindow);
+			private function createBackgroundWorker():void
+			{
+				bWorker = WorkerDomain.current.createWorker(new WORKER(), true);
+				
+				m2bChannel = Worker.current.createMessageChannel(bWorker);
+				b2mChannel = bWorker.createMessageChannel(Worker.current);
+				b2mChannel.addEventListener(Event.CHANNEL_MESSAGE, onB2MChannelMessage);
+				
+				bWorker.setSharedProperty('m2bChannel', m2bChannel);
+				bWorker.setSharedProperty('b2mChannel', b2mChannel);
+				bWorker.setSharedProperty('progressTitleWindow', progressTitleWindow);
+				
+				bWorker.start();
+			}
+			
+			/**
+			 * 修复 NumericStepper 在 value 为整数时以小数显示的问题。
+			 * 但是它虽然显示小数，也不会影响到 OSUPrinter，它打印出的还是整数。
+			 */
+			protected function stepper_formatFunc(value:Number):String
+			{
+				const intager:uint = uint(value);
+				return value == intager ?
+					intager.toString() :
+					value.toString();
+			}
+			
+			// TODO: 把选择编码UI补上。还有去BMS2OSUConverter里把+1K的判断搞下，再来这补UI。
+			
+		]]>
+	</fx:Script>
+	
 	<fx:Declarations>
-		<fx:String id="encoding">shift_jis</fx:String>
+		<models:Config id="config"/>
 		
 		<s:ArrayList id="encodings">
 			<fx:String>shift_jis</fx:String>
@@ -23,50 +96,92 @@
 			<fx:String>utf8</fx:String>
 		</s:ArrayList>
 		
-		<fx:Number id="OD">9</fx:Number>
-		<fx:Number id="HP">8</fx:Number>
-		
-		<fx:String id="addNoScratch">否</fx:String>
-		
-		<s:ArrayList id="saraTypes">
+		<s:ArrayList id="scratchTypes">
 			<fx:String>是</fx:String>
 			<fx:String>否</fx:String>
 		</s:ArrayList>
-		
-		<fx:String id="hitSoundType">有</fx:String>
 		
 		<s:ArrayList id="hitSoundTypes">
 			<fx:String>有</fx:String>
 			<fx:String>无</fx:String>
 		</s:ArrayList>
 		
-		<fx:uint id="volume">70</fx:uint>
+		<fx:Array id="validators">
+			<mx:StringValidator source="{bmsDirInput}" property="text" required="true"/>
+			<mx:StringValidator source="{outputDirInput}" property="text" required="true"/>
+		</fx:Array>
 		
 	</fx:Declarations>
 	
+	<local:states>
+		<s:State name="default"/>
+		<s:State name="converting"/>
+	</local:states>
+	
+	<s:Form id="form" horizontalCenter="0" verticalCenter="0" defaultButton="{submitButton}">
+		<s:FormItem label="BMS 文件夹：" width="100%" required="true">
+			<s:layout>
+				<s:HorizontalLayout/>
+			</s:layout>
+			<s:TextInput id="bmsDirInput" text="@{config.bmsDirStr}"/>
+			<s:Button label="选择"
+					  click="selectBMSBtn_clickHandler(event)"/>
+		</s:FormItem>
+		
+		<s:FormItem label="输出文件夹：" width="100%" required="true">
+			<s:layout>
+				<s:HorizontalLayout/>
+			</s:layout>
+			<s:TextInput id="outputDirInput" text="@{config.outputDirStr}"/>
+			<s:Button label="选择"
+					  click="selectOutputBtn_clickHandler(event)"/>
+		</s:FormItem>
+		
+		<s:FormItem label="编码：" width="100%">
+			<s:ComboBox selectedItem="@{config.encoding}"
+						dataProvider="{encodings}"/>
+		</s:FormItem>
+		
+		<s:FormItem label="OD：" width="100%">
+			<s:layout>
+				<s:HorizontalLayout verticalAlign="middle"/>
+			</s:layout>
+			<s:HSlider value="@{config.OD}" snapInterval="0.1" dataTipPrecision="1"/>
+			<s:NumericStepper value="@{config.OD}" snapInterval="0.1" stepSize="0.1" valueFormatFunction="stepper_formatFunc"/>
+		</s:FormItem>
+		
+		<s:FormItem label="HP：" width="100%">
+			<s:layout>
+				<s:HorizontalLayout verticalAlign="middle"/>
+			</s:layout>
+			<s:HSlider value="@{config.HP}" snapInterval="0.1" dataTipPrecision="1"/>
+			<s:NumericStepper value="@{config.HP}" snapInterval="0.1" stepSize="0.1" valueFormatFunction="stepper_formatFunc"/>
+		</s:FormItem>
+		
+		<s:FormItem label="是否附加7k无皿谱：" width="100%">
+			<s:DropDownList selectedItem="@{config.addNoScratch}"
+							dataProvider="{scratchTypes}"/>
+		</s:FormItem>
+		
+		<s:FormItem label="默认击打音效：" width="100%">
+			<s:helpContent>
+				<s:Label text="无 Key 音谱会附加击打音效"/>
+			</s:helpContent>
+			<s:DropDownList selectedItem="@{config.hitSoundType}"
+							dataProvider="{hitSoundTypes}"/>
+		</s:FormItem>
+		
+		<s:FormItem label="默认击打音效音量：" width="100%">
+			<s:NumericStepper minimum="0" maximum="100" value="@{config.volume}"/>
+		</s:FormItem>
+		
+		<s:FormItem>
+			<s:Button id="submitButton" label="训练" click="convertBtn_clickHandler(event)"/>
+		</s:FormItem>
+	</s:Form>
+	
 	<fx:Script aoi:section="controller">
 		<![CDATA[
-			import mx.events.FlexEvent;
-			
-			import songs.bmses.BMS;
-			import songs.bmses.BMSPack;
-			import songs.osus.BMS2OSUConverter;
-			import songs.osus.Beatmap;
-			
-			public static var current:Main;
-			
-			[Bindable]
-			private var bmsDirStr:String;
-			[Bindable]
-			private var outputDirStr:String;
-			
-			private var file:File = new File();
-			private var files:Vector.<File> = new <File>[];
-			
-			private var processingBMSPackIndex:uint;
-			
-			private var bmsPacks:Vector.<BMSPack>;
-			private var collectedBMSPacks:Vector.<BMSPack>;
 			
 			//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 			//  Application
@@ -75,6 +190,80 @@
 			protected function applicationCompleteHandler(event:FlexEvent):void
 			{
 				current = this;
+				
+				createBackgroundWorker();
+			}
+			
+			//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
+			//  Worker
+			//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
+			
+			private function onB2MChannelMessage(event:Event):void
+			{
+				if (!b2mChannel.messageAvailable)
+					return;
+				
+				const msg:String = b2mChannel.receive(true);
+				
+				if (msg in this)
+				{
+					this[msg]();
+				}
+				else switch (msg)
+				{
+					case BackgroundWorker.HEAD_BMS_PROGRESS:
+						progressTitleWindow.setBMSProgress.apply(null, b2mChannel.receive(true));
+						break;
+					
+					case BackgroundWorker.HEAD_BMSPACK_PROGRESS:
+						progressTitleWindow.setBMSPackProgress.apply(null, b2mChannel.receive(true));
+						break;
+					
+					default:
+						throw new Error('未知的消息：' + msg);
+				}
+			}
+			
+			//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
+			//  Meassage
+			//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
+			
+			public function collecting():void
+			{
+				progressTitleWindow.currentState = 'collecting_bmsPacks';
+			}
+			
+			public function arranging():void
+			{
+				progressTitleWindow.currentState = 'arranging';
+			}
+			
+			/**
+			 * 这儿的函数全用 public，以便 this[msg](); 能方便调用。
+			 */
+			public function not_found():void
+			{
+				Alert.show('然而你选的 BMS 文件夹中并没有找到 BMS', 'あれ？', Alert.OK, null, ok);
+				
+				function ok():void
+				{
+					PopUpManager.removePopUp(progressTitleWindow);
+				}
+			}
+			
+			public function cancel():void
+			{
+				PopUpManager.removePopUp(progressTitleWindow);
+			}
+			
+			public function complete():void
+			{
+				Alert.show('BMS 已经全部转换完毕！', 'やっっったぁぁぁぁぁ！', Alert.OK, null, ok);
+				
+				function ok():void
+				{
+					PopUpManager.removePopUp(progressTitleWindow);
+				}
 			}
 			
 			//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
@@ -93,303 +282,38 @@
 				file.browseForDirectory('选择输出文件夹');
 			}
 			
-			protected function convertBtn_clickHandler(event:MouseEvent):void
-			{
-				collectBMSPacks();
-			}
-			
-		]]>
-	</fx:Script>
-	
-	<fx:Script aoi:section="model">
-		<![CDATA[
-			import events.BMSEvent;
-			
 			protected function bmsDir_selectHandler(event:Event):void
 			{
 				file.removeEventListener(Event.SELECT, arguments.callee);
 				
-				bmsDirStr = decodeURIComponent(file.url);
+				config.bmsDirStr = decodeURIComponent(file.url);
 			}
 			
 			protected function outputDir_selectHandler(event:Event):void
 			{
 				file.removeEventListener(Event.SELECT, arguments.callee);
 				
-				outputDirStr = decodeURIComponent(file.url);
+				config.outputDirStr = decodeURIComponent(file.url);
 			}
 			
-			/**
-			 * 异步收集所有内含 BMS 的文件夹，一检测到（它里面含有 BMS）就返回，
-			 * 创建对应的 BMSPack，最后收集完毕调用 loadAll()。
-			 * @see #walkDirectoryAsync()
-			 */
-			protected function collectBMSPacks():void
+			registerClassAlias('models.Config', Config);
+			protected function convertBtn_clickHandler(event:MouseEvent):void
 			{
-				bmsPacks = new <BMSPack>[];
-				collectedBMSPacks = new <BMSPack>[];
+				const res:Array = Validator.validateAll(validators);
+				if (res.length != 0)
+					return;
 				
-				const bmsDir:File = new File(bmsDirStr);
-				walkDirectoryAsync(bmsDir, walkFunc, collectBMSes, false);
+				currentState = 'converting';
 				
-				function walkFunc(file:File, dir:File):Boolean
-				{
-					trace("Main.walkFunc(file, dir) : ", file.name);
-					const extension:String = file.extension;
-					if (file.isDirectory === false && BMS.isBMS(file))
-					{
-						bmsPacks.push(new BMSPack(dir));
-						return true;
-					}
-					
-					return false;
-				}
+				PopUpManager.addPopUp(progressTitleWindow, this, true);
+				PopUpManager.centerPopUp(progressTitleWindow);
 				
-				function collectBMSes():void
-				{
-					for each (var bmsPack:BMSPack in bmsPacks) 
-					{
-						bmsPack.addEventListener(BMSEvent.COLLECTED, bmspack_collectedHandler);
-						bmsPack.addEventListener(IOErrorEvent.IO_ERROR, bmsPack_IoErrorHandler);
-						bmsPack.collectAll();
-					}
-				}
-				
-				/**
-				 * 等到全部 bmsPack 都收集完毕了，就一个一个开始转换。
-				 */
-				function bmspack_collectedHandler(event:BMSEvent):void
-				{
-					const bmsPack:BMSPack= event.currentTarget as BMSPack;
-					
-					bmsPack.removeEventListener(BMSEvent.COLLECTED, arguments.callee);
-					
-					collectedBMSPacks.push(bmsPack);
-					
-					if (collectedBMSPacks.length == bmsPacks.length)
-					{
-						processingBMSPackIndex = 0;
-						loadBMSPack();
-					}
-				}
+				m2bChannel.send(BackgroundWorker.HEAD_START);
+				m2bChannel.send(config);
 			}
-			
-			protected function loadBMSPack():void
-			{
-				trace("Main.loadBMSPack()");
-				const bmsPack:BMSPack = bmsPacks[processingBMSPackIndex];
-				bmsPack.addEventListener(BMSEvent.LOADED, parseBMSPack);
-				bmsPack.loadAll();
-			}
-			
-			protected function parseBMSPack(event:BMSEvent):void
-			{
-				trace("Main.parseBMSPack(event)");
-				const bmsPack:BMSPack = event.currentTarget as BMSPack;
-				bmsPack.removeEventListener(BMSEvent.LOADED, arguments.callee);
-				bmsPack.addEventListener(BMSEvent.PARSED, convertBMSPack);
-				bmsPack.parseAll();
-			}
-			
-			/**
-			 * 转换 BMSPack。
-			 */
-			protected function convertBMSPack(event:BMSEvent):void
-			{
-				trace("Main.convertBMSPack(event)");
-				const bmsPack:BMSPack = event.currentTarget as BMSPack;
-				
-				bmsPack.removeEventListener(BMSEvent.LOADED, arguments.callee);
-				
-				// 转换。
-				const converter:BMS2OSUConverter = new BMS2OSUConverter(bmsPack);
-				const beatmap:Beatmap = converter.convert();
-				beatmap.collectResources();
-				
-				// 设置输出文件夹。
-				const outputDir:File = new File(outputDirStr);
-				
-				// 根据当前正在处理的 bmsPack 索引判断是应该继续处理下一个还是处理完成了。
-				const listener:Function = processingBMSPackIndex != bmsPacks.length - 1 ?
-					nextBMSPack : complete;
-				beatmap.addEventListener(Event.COMPLETE, listener);
-				beatmap.addEventListener(IOErrorEvent.IO_ERROR, onIoError);
-				beatmap.addEventListener(ErrorEvent.ERROR, onError);
-				
-				// 保存到输出文件夹。
-				beatmap.saveAsync(outputDir);
-				
-				function nextBMSPack(event:Event):void
-				{
-					beatmap.removeEventListener(Event.COMPLETE, arguments.callee);
-					
-					processingBMSPackIndex++;
-					loadBMSPack();
-				}
-				
-				function onIoError(event:IOErrorEvent):void
-				{
-					trace(event.toString());
-				}
-				
-				function onError(event:ErrorEvent):void
-				{
-					trace(event.toString());
-				}
-			}
-			
-			private function complete(event:Event):void
-			{
-				const beatmap:Beatmap = event.currentTarget as Beatmap;
-				
-				beatmap.removeEventListener(Event.COMPLETE, arguments.callee);
-				
-				trace('Complete: ' + beatmap.name + ' !');
-			}
-			
-			protected function bmsPack_IoErrorHandler(event:IOErrorEvent):void
-			{
-				trace(event.toString());
-			}
-			
-			/**
-			 * 修复 NumericStepper 在 value 为整数时以小数显示的问题。
-			 * 但是它虽然显示小数，也不会影响到 OSUPrinter，它打印出的还是整数。
-			 */
-			protected function stepper_formatFunc(value:Number):String
-			{
-				const intager:uint = uint(value);
-				return value == intager ?
-					intager.toString() :
-					value.toString();
-			}
-			
-			/**
-			 * 异步遍历目录。文件和文件夹都会调用。
-			 * 把它放进来的原因是我的库可能会变，另外重点是这个函数真的能通用？
-			 * @param directory 要遍历的目录
-			 * @param walkFunc 遍历文件的函数 function(file:File[, dir:File]):void/Boolean（条件返回 true 则不在此 file 中继续遍历）
-			 * @param completeFunc 完成遍历后的函数 function():void
-			 * @param isRootOnly 是否只遍历根目录
-			 */
-			public static function walkDirectoryAsync(directory:File, walkFunc:Function,
-													  completeFunc:Function,
-													  isRootOnly:Boolean = false):void
-			{
-			
-				const walkingDirs:Vector.<File> = new <File>[];
-				
-				directory.addEventListener(FileListEvent.DIRECTORY_LISTING, directory_listingHandler);
-				walkingDirs.push(directory);
-				directory.getDirectoryListingAsync();
-				
-				function directory_listingHandler(event:FileListEvent):void
-				{
-					const dir:File = event.currentTarget as File;
-					dir.removeEventListener(FileListEvent.DIRECTORY_LISTING, arguments.callee);
-					walkingDirs.splice(walkingDirs.indexOf(dir), 1);
-					
-					const files:Array = event.files;
-					for each (var file:File in files)
-					{
-						if (walkFunc(file, dir))
-							break;
-						
-						if (!isRootOnly && file.isDirectory)
-						{
-							file.addEventListener(FileListEvent.DIRECTORY_LISTING, arguments.callee);
-							walkingDirs.push(file);
-							file.getDirectoryListingAsync();
-						}
-					}
-					
-					if (walkingDirs.length == 0)
-						completeFunc();
-				}
-			}
-			
-			// TODO: 把选择编码UI补上。还有去BMS2OSUConverter里把+1K的判断搞下，再来这补UI。
-			// TODO: 异步处理 BMS，显示进度。还有自动搜寻 zip 里的 BMS。 
 			
 		]]>
 	</fx:Script>
-	
-	<local:header>
-		
-	</local:header>
-	
-	<local:layout>
-		<s:VerticalLayout horizontalAlign="left"/>
-	</local:layout>
-	
-	<s:Form id="form" width="200" height="200" defaultButton="{submitButton}">
-		<s:FormItem label="BMS 文件夹：" width="100%" required="true">
-			<s:layout>
-				<s:HorizontalLayout/>
-			</s:layout>
-			<s:TextInput text="@{bmsDirStr}"/>
-			<s:Button label="选择"
-					  click="selectBMSBtn_clickHandler(event)"/>
-		</s:FormItem>
-		
-		<s:FormItem label="输出文件夹：" width="100%" required="true">
-			<s:layout>
-				<s:HorizontalLayout/>
-			</s:layout>
-			<s:TextInput text="@{outputDirStr}"/>
-			<s:Button label="选择"
-					  click="selectOutputBtn_clickHandler(event)"/>
-		</s:FormItem>
-		
-		<s:FormItem label="编码：" width="100%">
-			<s:ComboBox selectedItem="@{encoding}"
-						dataProvider="{encodings}"/>
-		</s:FormItem>
-		
-		<s:FormItem label="OD：" width="100%">
-			<s:layout>
-				<s:HorizontalLayout verticalAlign="middle"/>
-			</s:layout>
-			<s:HSlider value="@{OD}" snapInterval="0.1" dataTipPrecision="1"/>
-			<s:NumericStepper value="@{OD}" snapInterval="0.1" stepSize="0.1" valueFormatFunction="stepper_formatFunc"/>
-		</s:FormItem>
-		
-		<s:FormItem label="HP：" width="100%">
-			<s:layout>
-				<s:HorizontalLayout verticalAlign="middle"/>
-			</s:layout>
-			<s:HSlider value="@{HP}" snapInterval="0.1" dataTipPrecision="1"/>
-			<s:NumericStepper value="@{HP}" snapInterval="0.1" stepSize="0.1" valueFormatFunction="stepper_formatFunc"/>
-		</s:FormItem>
-		
-		<s:FormItem label="是否附加7k无皿谱：" width="100%">
-			<s:DropDownList selectedItem="@{addNoScratch}"
-							dataProvider="{saraTypes}"/>
-		</s:FormItem>
-		
-		<s:FormItem label="默认击打音效：" width="100%">
-			<s:DropDownList selectedItem="@{hitSoundType}"
-							dataProvider="{hitSoundTypes}"/>
-		</s:FormItem>
-		
-		<s:FormItem label="默认击打音效音量：" width="100%">
-			<s:NumericStepper minimum="0" maximum="100" value="@{volume}"/>
-		</s:FormItem>
-		
-		<s:Button id="submitButton" label="训练" click="convertBtn_clickHandler(event)"/>
-	</s:Form>
-	
-	<local:footer>
-		
-	</local:footer>
-	
-	<local:leftSide>
-		
-	</local:leftSide>
-	
-	<local:rightSide>
-		
-	</local:rightSide>
 	
 </local:MainBase>
 
