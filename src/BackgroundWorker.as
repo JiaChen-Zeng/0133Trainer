@@ -57,6 +57,15 @@ package
 		
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		//
+		//  Class variables
+		//
+		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
+		
+		/** 麻痹 AIR 的 Worker 获取到的路径会乱码，只能用 Main 获取再传过来。 */
+		public static var APPLICATION_DIRECTORY:File;
+		
+		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
+		//
 		//  Constructor
 		//
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
@@ -90,12 +99,14 @@ package
 		//
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		
+		registerClassAlias('flash.filesystem.File', File);
 		private function init():void
 		{
 			const current:Worker = Worker.current;
 			
 			m2bChannel = current.getSharedProperty('m2bChannel');
 			b2mChannel = current.getSharedProperty('b2mChannel');
+			APPLICATION_DIRECTORY = current.getSharedProperty('applicationDirectory');
 			
 			m2bChannel.addEventListener(Event.CHANNEL_MESSAGE, onM2BChannelMessage);
 		}

@@ -36,6 +36,14 @@ package songs.osus
 	{
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		//
+		//  Class variables
+		//
+		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
+		
+		private static var ffmpeg:FFMPEG = new FFMPEG(BackgroundWorker.APPLICATION_DIRECTORY.resolvePath('assets/ffmpeg.exe'));
+		
+		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
+		//
 		//  Constructor
 		//
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
@@ -108,18 +116,18 @@ package songs.osus
 			}
 		}
 		
-		registerClassAlias('flash.filesystem.File', File);
+//		registerClassAlias('flash.filesystem.File', File);
 		public function saveAsync(outputDir:File):void
 		{
 			outputDirectory = outputDir;
 //			bmsPack = osues[0].bms.bmsPack;
-			const ba:ByteArray = new ByteArray();
-			ba.writeObject(bmsPack.directory);
-			ba.position = 0;
-			directory = ba.readObject();
+//			const ba:ByteArray = new ByteArray();
+//			ba.writeObject(bmsPack.directory);
+//			ba.position = 0;
+//			directory = ba.readObject();
+			directory = bmsPack.directory;
 			
 			index = 0;
-			dispatchEvent(new BMSEvent(BMSEvent.COPYING_OSU, null, index, osues.length));
 			saveOSUAsync();
 		}
 		
@@ -146,6 +154,9 @@ package songs.osus
 				tempFile.addEventListener(Event.COMPLETE, nextFunc);
 				tempFile.addEventListener(IOErrorEvent.IO_ERROR, OnIoError)
 				tempFile.copyToAsync(dst, true);
+				
+				if (index == 0) // 第一个复制的文件名这样才会显示出来。
+					dispatchEvent(new BMSEvent(BMSEvent.COPYING_OSU, dst.name, index, osues.length));
 				
 				trace('copy:', FileReferenceUtil.filterName(osu.name, ' ') + '.osu');
 			} 
@@ -227,6 +238,9 @@ package songs.osus
 			file.addEventListener(IOErrorEvent.IO_ERROR, OnIoError);
 			file.copyToAsync(dst, true);
 			
+			if (index == 0) // 第一个复制的文件名这样才会显示出来。
+				dispatchEvent(new BMSEvent(BMSEvent.COPYING_WAV, dst.name, index, wavs.length));
+			
 			function nextWav(event:Event = null):void
 			{
 				file.removeEventListener(Event.COMPLETE, arguments.callee);
@@ -306,7 +320,6 @@ package songs.osus
 			||  extension == 'mpeg')
 			{
 				// TODO: 写成字段看看会不会出错。
-				const ffmpeg:FFMPEG = new FFMPEG(File.applicationDirectory.resolvePath('assets/ffmpeg.exe'));
 				ffmpeg.addEventListener(Event.COMPLETE, nextFunc);
 				ffmpeg.addEventListener(ErrorEvent.ERROR, onError);
 				// TODO: try。
@@ -318,6 +331,9 @@ package songs.osus
 				file.addEventListener(IOErrorEvent.IO_ERROR, OnIoError);
 				file.copyToAsync(dst, true);
 			}
+			
+			if (index == 0) // 第一个复制的文件名这样才会显示出来。
+				dispatchEvent(new BMSEvent(BMSEvent.COPYING_BMP, dst.name, index, bmps.length));
 			
 			function nextBmp(event:Event = null):void
 			{

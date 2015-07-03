@@ -4,13 +4,15 @@
 				xmlns:mx="library://ns.adobe.com/flex/mx"
 				xmlns:aoi="http://www.aoi.moe/"
 				xmlns:local="*"
+				xmlns:components="components.*"
+				xmlns:models="models.*"
 				
 				title="0133训练机"
 				width="560"
 				height="360"
 				skinClass="skins.MainSkin"
 				showStatusBar="false"
-				applicationComplete="applicationCompleteHandler(event)" xmlns:components="components.*" xmlns:models="models.*">
+				applicationComplete="applicationCompleteHandler(event)">
 	
 	<fx:Style source="css/Main.css"/>
 	
@@ -54,7 +56,10 @@
 			private var m2bChannel:MessageChannel;
 			private var b2mChannel:MessageChannel;
 			
-			registerClassAlias('components.ProgressTitleWindow', components.ProgressTitleWindow);
+			registerClassAlias('flash.filesystem.File', File);
+			/**
+			 * @see BackgroundWorker#applicationDirectory
+			 */
 			private function createBackgroundWorker():void
 			{
 				bWorker = WorkerDomain.current.createWorker(new WORKER(), true);
@@ -65,7 +70,7 @@
 				
 				bWorker.setSharedProperty('m2bChannel', m2bChannel);
 				bWorker.setSharedProperty('b2mChannel', b2mChannel);
-				bWorker.setSharedProperty('progressTitleWindow', progressTitleWindow);
+				bWorker.setSharedProperty('applicationDirectory', new File(File.applicationDirectory.nativePath));
 				
 				bWorker.start();
 			}

@@ -92,8 +92,8 @@ package songs.bmses
 				|| extension == 'bns'
 				|| extension == 'pms'
 				// 等等…… syk 这不是…… さやか 啊！哪有这样吃饱没事干的人？
-				|| extension == 'syk' // TODO: 还有什么奇葩格式？
-				|| extension == 'sm'; // 待测试
+				|| extension == 'syk'; // TODO: 还有什么奇葩格式？
+//				|| extension == 'sm'; // sm 不一样格式。
 		}
 		
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
