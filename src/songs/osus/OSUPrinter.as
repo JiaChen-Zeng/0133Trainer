@@ -8,7 +8,7 @@ package songs.osus
 		//
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		
-		[Embed(source="assets/default.osu", mimeType="application/octet-stream")]
+		[Embed(source="/../libs/default.osu", mimeType="application/octet-stream")]
 		internal static const TEMPLATE:Class;
 		
 		internal static const RE_VAR:RegExp = /{\w+}/g;

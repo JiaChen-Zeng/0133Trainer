@@ -179,6 +179,11 @@ package songs.osus
 		private var lastTimingPoint_position:Number;
 		
 		/**
+		 * 解决 getUnknownTime() 里参照的最后一个 bpm3data 不对的问题。
+		 */
+		private var lastRedTimingPoint_bpm:Number;
+		
+		/**
 		 * 必须用 Number，这个是原始的 offset 数值，没有 Math.round() 过的。
 		 * 为了调整有 stop 的 meter 小节的 offset，需要精确的数值。
 		 */
@@ -260,6 +265,7 @@ package songs.osus
 				bms.artist + ' & ' + bms.subartist :
 				bms.artist;
 			osu.version = 'Lv. ' + bms.playlevel.toString() || '?';
+			// TODO: 单个 bms 的 bmspack 的 version 还是要再做下。
 			if (res.version)
 				osu.version += ' ' + res.version;
 			// TODO: 根据 rank total 设置 HP 和 OD。
@@ -517,8 +523,8 @@ package songs.osus
 				// 走到了从最后节拍数据开始之后的小节。
 				// 如果紧接的下一个小节还有继续节拍，当前后的节拍数值都一样的，就继续这个TimingPoint，不做修改。
 				if (nextMeterData
-				&&  nextMeterData.measureIndex === thisMeterData.measureIndex + 1
-				&&  thisMeterData.content === nextMeterData.content)
+				&&  nextMeterData.measureIndex == thisMeterData.measureIndex + 1
+				&&  thisMeterData.content == nextMeterData.content)
 				{
 					thisMeterData = nextMeterData;
 					nextMeterData = null;
@@ -588,11 +594,13 @@ package songs.osus
 				tp.type = TimingPoint.TYPE_TIMING;
 				
 				lastBPM3Data = data;
+				
+				lastRedTimingPoint_bpm = data.content;
 			}
 			else if (data.channel === BMS.CHANNEL_BPM_EXTENDED)
 			{
 				// BPM 一定会在 BPM_EXTENDED 之前出现，lastBPM3Data 就不用判断了。没有的话，我也要让他有！
-				tp.time = getUnknownTime(data, lastBPM3Data);
+				tp.time = getUnknownTime(data);
 				tp.type = TimingPoint.TYPE_INHERITED;
 				
 				// 判断超变速的话稍微处理一下，因为这不是 Timing tp，
@@ -668,12 +676,12 @@ package songs.osus
 			const tp:TimingPoint = new TimingPoint();
 //			var offset:Number = getOffset2(data, lastBPMData, thisMeterData);
 			const offset:Number = getOffset3(data);
+			const thisBPM:Number = getThisBPM();
+			
 			tp.offset = Math.round(offset);
 			// 现在我把 :583 这一句和 :598 这一句的 lastBPMData 用 lastBPM3Data 代替，试试行不行。
 			// 再次修改，换成了获取最后 bpm 的，这个才是正确的，但是 d 什么那个谱又 99598*** 了。
-			tp.time = MINUTE / (lastBPMData.channel === BMS.CHANNEL_BPM ? // 判断是 BPM 还是 BPM_EXTENDED。
-				lastBPMData.content :
-				bms.bpms[lastBPMData.content]); // 原来这里原来就错了，一直就是错的，后来被转 bpm 的函数删掉了所以没影响？
+			tp.time = MINUTE / thisBPM; // 原来这里原来就错了，一直就是错的，后来被转 bpm 的函数删掉了所以没影响？
 			tp.type = TimingPoint.TYPE_TIMING;
 //			tp.time = getUnknownTimeByMeter(data, lastBPM3Data);
 //			tp.type = TimingPoint.TYPE_INHERITED;
@@ -683,6 +691,7 @@ package songs.osus
 			lastTimingPoint = tp;
 			lastTimingPoint_offset = offset;
 			lastTimingPoint_position = data.measureIndex;
+			lastRedTimingPoint_bpm = thisBPM;
 			
 			// 缓存终止 TP。这时候参照的 offset 是上面的那个哟。
 			
@@ -692,9 +701,7 @@ package songs.osus
 			const endTp:TimingPoint = new TimingPoint();
 //			const endTp_offset:Number = getMeasureTime(lastBPMData, thisMeterData) + offset;
 //			endTp.offset = Math.round(endTp_offset);
-			endTp.time = MINUTE / (lastBPMData.channel === BMS.CHANNEL_BPM ? // 判断是 BPM 还是 BPM_EXTENDED。
-				lastBPMData.content :
-				bms.bpms[lastBPMData.content]);
+			endTp.time = MINUTE / getThisBPM();
 			endTp.type = TimingPoint.TYPE_TIMING;
 			
 			thisMeterEndTimingPoint = endTp;
@@ -1123,12 +1130,8 @@ package songs.osus
 		private function getMeasureTime(bpmData:Data, meterData:Data = null):Number
 		{
 			// TP 的 time 和这个没关系。
-			const num:Number = MINUTE /
-				(bpmData.channel === BMS.CHANNEL_BPM ? // 判断是 BPM 还是 BPM_EXTENDED，获取当前 BPM。
-					bpmData.content :
-					bms.bpms[bpmData.content]) * 4 * (meterData ? // 获取当前 meter，没有的话就是默认的 1。
-														meterData.content :
-														1);
+			const num:Number = MINUTE / getThisBPM() * 4 * (meterData ? // 获取当前 meter，没有的话就是默认的 1。
+				meterData.content : 1);
 			return num;
 		}
 		
@@ -1155,7 +1158,7 @@ package songs.osus
 		private function getOffset2(data:Data, prevBPMData:Data, _thisMeterData:Data = null):Number
 		{
 			const num:Number = getMeasureTime(prevBPMData, _thisMeterData)
-				* getDistance(data, (_thisMeterData && data !== _thisMeterData && _thisMeterData.measureIndex > prevBPMData.measureIndex) ?
+				* getDistance(data, (_thisMeterData && data != _thisMeterData && _thisMeterData.measureIndex > prevBPMData.measureIndex) ?
 					_thisMeterData :
 					prevBPMData)
 				+ lastTimingPoint_offset;
@@ -1176,9 +1179,11 @@ package songs.osus
 		/**
 		 * 获取谜之数值。
 		 */
-		private function getUnknownTime(bpm8Data:Data, prevBPM3Data:Data):Number
+		private function getUnknownTime(bpm8Data:Data):Number
 		{
-			return -100 / (bms.bpms[bpm8Data.content] / prevBPM3Data.content);
+			return -100 / (bms.bpms[bpm8Data.content] /
+//				prevBPM3Data.content); // 这里不应该参照最后的 bpm3，如果 meter 在它后面就美丽。
+				lastRedTimingPoint_bpm);
 		}
 		
 		private function getUnknownTimeByMeter(meterData:Data, prevBPM3Data:Data):Number
@@ -1197,6 +1202,14 @@ package songs.osus
 			// TODO: BMS拍数判断。换掉这个4 →→→↓
 			return Math.round(60000 / osu.bpm * 4 * (measureIndex + (index === 0 ? 0 : index * 1 / length)));
 		}
+		
+		private function getThisBPM():Number
+		{
+			return lastBPMData.channel == BMS.CHANNEL_BPM ? // 判断是 BPM 还是 BPM_EXTENDED。
+				lastBPMData.content :
+				bms.bpms[lastBPMData.content];
+		}
+		
 		/**
 		 * 延后的时间公式：(60000（一分钟毫秒数） / 60（BPM）)（每拍时间）* 4（拍） * 48（STOP值） / 192（最大节拍细分） == 1
 		 * MINUTE / bpm * 4 * stop / MAX_DIVISION
@@ -1205,9 +1218,7 @@ package songs.osus
 		private function getStopTime(data:Data):Number
 		{
 			const stopTime:Number = MINUTE /
-				(lastBPMData.channel === BMS.CHANNEL_BPM ? // 判断是 BPM 还是 BPM_EXTENDED。
-				lastBPMData.content :
-				bms.bpms[lastBPMData.content]) *
+				getThisBPM() *
 				4 * bms.stops[data.content] / MAX_DIVISION;
 			return stopTime;
 		}
@@ -1224,35 +1235,6 @@ package songs.osus
 		{
 			return RE_VIDEO.test(name);
 		}
-		
-		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
-		//  IExternalizable
-		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
-		
-//		public function writeExternal(output:IDataOutput):void
-//		{
-//			output.writeObject(bms);
-//			output.writeObject(iBMS);
-//			output.writeObject(osu);
-//			output.writeObject(beatmap);
-//			output.writeObject(keyCounter);
-//			output.writeObject(haveKeySound);
-//			output.writeObject(haveScratch);
-//			output.writeObject();
-//			output.writeObject();
-//			output.writeObject();
-//			output.writeObject();
-//			output.writeObject();
-//			output.writeObject();
-//			output.writeObject();
-//			output.writeObject();
-//			output.writeObject();
-//		}
-//		
-//		public function readExternal(input:IDataInput):void
-//		{
-//			
-//		}
 	}
 }
 

@@ -29,6 +29,7 @@
 	<fx:Script aoi:section="model">
 		<![CDATA[
 			import flash.net.registerClassAlias;
+			import flash.system.Worker;
 			
 			import mx.events.FlexEvent;
 			import mx.managers.PopUpManager;
@@ -40,7 +41,7 @@
 			
 			public static var current:Main;
 			
-			[Embed(source="workerswfs/BackgroundWorker.swf", mimeType="application/octet-stream")]
+			[Embed(source="/../libs/workers/BackgroundWorker2.swf", mimeType="application/octet-stream")]
 			private static const WORKER:Class;
 			
 			private var file:File = new File();

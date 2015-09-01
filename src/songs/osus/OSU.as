@@ -63,9 +63,9 @@ package songs.osus
 		
 		internal var version:String;
 		
-		public var source:String = '0133Trainer BMS';
+		public var source:String = 'BMS';
 		
-		public var tags:String = 'bms conversion';
+		public var tags:String = 'bms 0133Trainer';
 		
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		//  Difficulty
