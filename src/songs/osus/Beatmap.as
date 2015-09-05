@@ -1,6 +1,7 @@
 package songs.osus
 {
-	import flash.errors.IOError;
+	import assets.FFMPEG;
+	import events.BMSEvent;
 	import flash.events.ErrorEvent;
 	import flash.events.Event;
 	import flash.events.EventDispatcher;
@@ -9,17 +10,10 @@ package songs.osus
 	import flash.filesystem.File;
 	import flash.filesystem.FileMode;
 	import flash.filesystem.FileStream;
-	import flash.net.registerClassAlias;
-	import flash.utils.ByteArray;
-	
-	import assets.FFMPEG;
-	
-	import events.BMSEvent;
-	
 	import moe.aoi.utils.FileReferenceUtil;
-	
 	import songs.bmses.BMS;
 	import songs.bmses.BMSPack;
+	import workers.BackgroundWorker;
 
 	//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 	//  Events

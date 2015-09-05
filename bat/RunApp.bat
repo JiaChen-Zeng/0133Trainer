@@ -6,6 +6,7 @@ cd %~dp0 & cd ..
 set PAUSE_ERRORS=1
 call bat\SetupSDK.bat
 call bat\SetupApp.bat
+call bat\SetupWorkers.bat
 
 echo.
 echo Starting AIR Debug Launcher...

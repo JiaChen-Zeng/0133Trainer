@@ -28,20 +28,18 @@
 	-->
 	<fx:Script aoi:section="model">
 		<![CDATA[
+			import components.ProgressTitleWindow;
 			import flash.net.registerClassAlias;
 			import flash.system.Worker;
-			
 			import mx.events.FlexEvent;
 			import mx.managers.PopUpManager;
 			import mx.validators.Validator;
-			
 			import spark.components.Alert;
-			
-			import components.ProgressTitleWindow;
+			import workers.BackgroundWorker;
 			
 			public static var current:Main;
 			
-			[Embed(source="/../libs/workers/BackgroundWorker2.swf", mimeType="application/octet-stream")]
+			[Embed(source="/../libs/workers/BackgroundWorker.swf", mimeType="application/octet-stream")]
 			private static const WORKER:Class;
 			
 			private var file:File = new File();
@@ -90,104 +88,7 @@
 			
 			// TODO: 把选择编码UI补上。还有去BMS2OSUConverter里把+1K的判断搞下，再来这补UI。
 			
-		]]>
-	</fx:Script>
-	
-	<fx:Declarations>
-		<models:Config id="config"/>
-		
-		<s:ArrayList id="encodings">
-			<fx:String>shift_jis</fx:String>
-			<fx:String>gb18030</fx:String>
-			<fx:String>utf8</fx:String>
-		</s:ArrayList>
-		
-		<s:ArrayList id="scratchTypes">
-			<fx:String>是</fx:String>
-			<fx:String>否</fx:String>
-		</s:ArrayList>
-		
-		<s:ArrayList id="hitSoundTypes">
-			<fx:String>有</fx:String>
-			<fx:String>无</fx:String>
-		</s:ArrayList>
-		
-		<fx:Array id="validators">
-			<mx:StringValidator source="{bmsDirInput}" property="text" required="true"/>
-			<mx:StringValidator source="{outputDirInput}" property="text" required="true"/>
-		</fx:Array>
-		
-	</fx:Declarations>
-	
-	<local:states>
-		<s:State name="default"/>
-		<s:State name="converting"/>
-	</local:states>
-	
-	<s:Form id="form" horizontalCenter="0" verticalCenter="0" defaultButton="{submitButton}">
-		<s:FormItem label="BMS 文件夹：" width="100%" required="true">
-			<s:layout>
-				<s:HorizontalLayout/>
-			</s:layout>
-			<s:TextInput id="bmsDirInput" text="@{config.bmsDirStr}"/>
-			<s:Button label="选择"
-					  click="selectBMSBtn_clickHandler(event)"/>
-		</s:FormItem>
-		
-		<s:FormItem label="输出文件夹：" width="100%" required="true">
-			<s:layout>
-				<s:HorizontalLayout/>
-			</s:layout>
-			<s:TextInput id="outputDirInput" text="@{config.outputDirStr}"/>
-			<s:Button label="选择"
-					  click="selectOutputBtn_clickHandler(event)"/>
-		</s:FormItem>
-		
-		<s:FormItem label="编码：" width="100%">
-			<s:ComboBox selectedItem="@{config.encoding}"
-						dataProvider="{encodings}"/>
-		</s:FormItem>
-		
-		<s:FormItem label="OD：" width="100%">
-			<s:layout>
-				<s:HorizontalLayout verticalAlign="middle"/>
-			</s:layout>
-			<s:HSlider value="@{config.OD}" snapInterval="0.1" dataTipPrecision="1"/>
-			<s:NumericStepper value="@{config.OD}" snapInterval="0.1" stepSize="0.1" valueFormatFunction="stepper_formatFunc"/>
-		</s:FormItem>
-		
-		<s:FormItem label="HP：" width="100%">
-			<s:layout>
-				<s:HorizontalLayout verticalAlign="middle"/>
-			</s:layout>
-			<s:HSlider value="@{config.HP}" snapInterval="0.1" dataTipPrecision="1"/>
-			<s:NumericStepper value="@{config.HP}" snapInterval="0.1" stepSize="0.1" valueFormatFunction="stepper_formatFunc"/>
-		</s:FormItem>
-		
-		<s:FormItem label="是否附加7k无皿谱：" width="100%">
-			<s:DropDownList selectedItem="@{config.addNoScratch}"
-							dataProvider="{scratchTypes}"/>
-		</s:FormItem>
-		
-		<s:FormItem label="默认击打音效：" width="100%">
-			<s:helpContent>
-				<s:Label text="无 Key 音谱会附加击打音效"/>
-			</s:helpContent>
-			<s:DropDownList selectedItem="@{config.hitSoundType}"
-							dataProvider="{hitSoundTypes}"/>
-		</s:FormItem>
-		
-		<s:FormItem label="默认击打音效音量：" width="100%">
-			<s:NumericStepper minimum="0" maximum="100" value="@{config.volume}"/>
-		</s:FormItem>
-		
-		<s:FormItem>
-			<s:Button id="submitButton" label="训练" click="convertBtn_clickHandler(event)"/>
-		</s:FormItem>
-	</s:Form>
-	
-	<fx:Script aoi:section="controller">
-		<![CDATA[
+			
 			
 			//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 			//  Application
@@ -317,6 +218,105 @@
 				m2bChannel.send(BackgroundWorker.HEAD_START);
 				m2bChannel.send(config);
 			}
+			
+		]]>
+	</fx:Script>
+	
+	<fx:Declarations>
+		<models:Config id="config"/>
+		
+		<s:ArrayList id="encodings">
+			<fx:String>shift_jis</fx:String>
+			<fx:String>gb18030</fx:String>
+			<fx:String>utf8</fx:String>
+		</s:ArrayList>
+		
+		<s:ArrayList id="scratchTypes">
+			<fx:String>是</fx:String>
+			<fx:String>否</fx:String>
+		</s:ArrayList>
+		
+		<s:ArrayList id="hitSoundTypes">
+			<fx:String>有</fx:String>
+			<fx:String>无</fx:String>
+		</s:ArrayList>
+		
+		<fx:Array id="validators">
+			<mx:StringValidator source="{bmsDirInput}" property="text" required="true"/>
+			<mx:StringValidator source="{outputDirInput}" property="text" required="true"/>
+		</fx:Array>
+		
+	</fx:Declarations>
+	
+	<local:states>
+		<s:State name="default"/>
+		<s:State name="converting"/>
+	</local:states>
+	
+	<s:Form id="form" horizontalCenter="0" verticalCenter="0" defaultButton="{submitButton}">
+		<s:FormItem label="BMS 文件夹：" width="100%" required="true">
+			<s:layout>
+				<s:HorizontalLayout/>
+			</s:layout>
+			<s:TextInput id="bmsDirInput" text="@{config.bmsDirStr}"/>
+			<s:Button label="选择"
+					  click="selectBMSBtn_clickHandler(event)"/>
+		</s:FormItem>
+		
+		<s:FormItem label="输出文件夹：" width="100%" required="true">
+			<s:layout>
+				<s:HorizontalLayout/>
+			</s:layout>
+			<s:TextInput id="outputDirInput" text="@{config.outputDirStr}"/>
+			<s:Button label="选择"
+					  click="selectOutputBtn_clickHandler(event)"/>
+		</s:FormItem>
+		
+		<s:FormItem label="编码：" width="100%">
+			<s:ComboBox selectedItem="@{config.encoding}"
+						dataProvider="{encodings}"/>
+		</s:FormItem>
+		
+		<s:FormItem label="OD：" width="100%">
+			<s:layout>
+				<s:HorizontalLayout verticalAlign="middle"/>
+			</s:layout>
+			<s:HSlider value="@{config.OD}" snapInterval="0.1" dataTipPrecision="1"/>
+			<s:NumericStepper value="@{config.OD}" snapInterval="0.1" stepSize="0.1" valueFormatFunction="stepper_formatFunc"/>
+		</s:FormItem>
+		
+		<s:FormItem label="HP：" width="100%">
+			<s:layout>
+				<s:HorizontalLayout verticalAlign="middle"/>
+			</s:layout>
+			<s:HSlider value="@{config.HP}" snapInterval="0.1" dataTipPrecision="1"/>
+			<s:NumericStepper value="@{config.HP}" snapInterval="0.1" stepSize="0.1" valueFormatFunction="stepper_formatFunc"/>
+		</s:FormItem>
+		
+		<s:FormItem label="是否附加7k无皿谱：" width="100%">
+			<s:DropDownList selectedItem="@{config.addNoScratch}"
+							dataProvider="{scratchTypes}"/>
+		</s:FormItem>
+		
+		<s:FormItem label="默认击打音效：" width="100%">
+			<s:helpContent>
+				<s:Label text="无 Key 音谱会附加击打音效"/>
+			</s:helpContent>
+			<s:DropDownList selectedItem="@{config.hitSoundType}"
+							dataProvider="{hitSoundTypes}"/>
+		</s:FormItem>
+		
+		<s:FormItem label="默认击打音效音量：" width="100%">
+			<s:NumericStepper minimum="0" maximum="100" value="@{config.volume}"/>
+		</s:FormItem>
+		
+		<s:FormItem>
+			<s:Button id="submitButton" label="训练" click="convertBtn_clickHandler(event)"/>
+		</s:FormItem>
+	</s:Form>
+	
+	<fx:Script aoi:section="controller">
+		<![CDATA[
 			
 		]]>
 	</fx:Script>
