@@ -1,4 +1,4 @@
-# 0133Trainer [![LGPLv2.1](https://img.shields.io/badge/license-LGPL--2.1-FF69B4.svg)+](https://github.com/S-Aoi/0133Trainer/blob/master/LICENSE)
+# 0133Trainer [![LGPL-2.1](https://img.shields.io/badge/license-LGPL--2.1-FF69B4.svg)](https://github.com/S-Aoi/0133Trainer/blob/master/LICENSE)
 BMS→OSU 转换器，帮助你追上0133~（虽然这是不可能的
 
 ## 已支持
