@@ -29,6 +29,7 @@
 	<fx:Script aoi:section="model">
 		<![CDATA[
 			import components.ProgressTitleWindow;
+			import flash.events.Event;
 			import flash.net.registerClassAlias;
 			import flash.system.Worker;
 			import mx.events.FlexEvent;
@@ -88,7 +89,9 @@
 			
 			// TODO: 把选择编码UI补上。还有去BMS2OSUConverter里把+1K的判断搞下，再来这补UI。
 			
-			
+			//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
+			//  Controllers
+			//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 			
 			//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 			//  Application
@@ -97,6 +100,7 @@
 			protected function applicationCompleteHandler(event:FlexEvent):void
 			{
 				current = this;
+				file.addEventListener(Event.CANCEL, file_cancelHandler);
 				
 				createBackgroundWorker();
 			}
@@ -148,6 +152,7 @@
 			/**
 			 * 这儿的函数全用 public，以便 this[msg](); 能方便调用。
 			 */
+			// TODO: Custom namespace?
 			public function not_found():void
 			{
 				Alert.show('然而你选的 BMS 文件夹中并没有找到 BMS', 'あれ？', Alert.OK, null, ok);
@@ -201,6 +206,12 @@
 				file.removeEventListener(Event.SELECT, arguments.callee);
 				
 				config.outputDirStr = decodeURIComponent(file.url);
+			}
+			
+			private function file_cancelHandler(e:Event):void 
+			{
+				file.removeEventListener(Event.SELECT, bmsDir_selectHandler);
+				file.removeEventListener(Event.SELECT, outputDir_selectHandler);
 			}
 			
 			registerClassAlias('models.Config', Config);
@@ -314,12 +325,6 @@
 			<s:Button id="submitButton" label="训练" click="convertBtn_clickHandler(event)"/>
 		</s:FormItem>
 	</s:Form>
-	
-	<fx:Script aoi:section="controller">
-		<![CDATA[
-			
-		]]>
-	</fx:Script>
 	
 </local:MainBase>
 
