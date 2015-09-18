@@ -5,5 +5,5 @@
 cd /d %~dp0..
 
 for /f %%G in ('dir /b src\workers\*.as') do (
-	call amxmlc.bat -compiler.debug -compiler.incremental -source-path "src" -output "libs\workers\%%~nG.swf" "src\workers\%%G"
+	call amxmlc.bat -compiler.debug -source-path "src" -compiler.incremental -output "libs\workers\%%~nG.swf" "src\workers\%%G"
 )

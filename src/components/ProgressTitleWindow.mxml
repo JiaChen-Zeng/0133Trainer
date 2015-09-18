@@ -2,10 +2,14 @@
 <s:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
 			   xmlns:s="library://ns.adobe.com/flex/spark" 
 			   xmlns:mx="library://ns.adobe.com/flex/mx"
-			   width="400" height="300">
+			   width="400" height="300"
+			   creationComplete="onCreationComplete(event)">
 	
 	<fx:Script>
 		<![CDATA[
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
 			
 			[Bindable]
 			private var bmsPack:String;
@@ -16,6 +20,15 @@
 			private var value:uint;
 			[Bindable]
 			private var total:uint;
+			
+			public function onCreationComplete(event:FlexEvent):void 
+			{
+				addEventListener(CloseEvent.CLOSE, onClose);
+			}
+			private function onClose(e:CloseEvent):void 
+			{
+				Main.current.cancel();
+			}
 			
 			public function setBMSPackProgress(bmsPack:String, value:uint, total:uint):void
 			{
@@ -58,7 +71,7 @@
 					mode="manual"/>
 	
 	<mx:ProgressBar id="bmsProgressBar"
-					label.collecting_bmsPacks	= "'等待中"
+					label.collecting_bmsPacks	= "正在收集 BMS 中"
 					label.collecting			= "{'收集 BMS: '		+ res}"
 					label.loading				= "{'加载 BMS: '		+ res}"
 					label.parsing				= "{'解析 BMS: '		+ res}"

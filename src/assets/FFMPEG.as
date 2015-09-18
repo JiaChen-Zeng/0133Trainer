@@ -79,7 +79,9 @@ package assets
 			// 如果目标的目录没有创建，就无法转换，所以得先创建目录。
 			const dstDir:File = new File(dst).resolvePath('..');
 			if (!dstDir.exists)
+			{
 				dstDir.createDirectory();
+			}
 			
 			stdout = '';
 			addEventListener(ProgressEvent.STANDARD_ERROR_DATA, onErrorData);
@@ -114,9 +116,13 @@ package assets
 			removeEventListener(NativeProcessExitEvent.EXIT, arguments.callee);
 			
 			if (event.exitCode == 0)
+			{
 				dispatchEvent(new Event(Event.COMPLETE));
+			}
 			else
+			{
 				dispatchEvent(new ErrorEvent(ErrorEvent.ERROR));
+			}
 		}
 	}
 }

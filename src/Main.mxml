@@ -26,16 +26,21 @@
 		6. 转换各个 BMS。
 		7. 复制各个 wav 和 bmp。
 	-->
-	<fx:Script aoi:section="model">
+	<fx:Script>
 		<![CDATA[
 			import components.ProgressTitleWindow;
+			import errors.BMSError;
+			import errors.BMSWarn;
 			import flash.events.Event;
+			import flash.events.UncaughtErrorEvent;
 			import flash.net.registerClassAlias;
 			import flash.system.Worker;
+			import mx.events.CloseEvent;
 			import mx.events.FlexEvent;
 			import mx.managers.PopUpManager;
 			import mx.validators.Validator;
-			import spark.components.Alert;
+			//import spark.components.Alert;
+			import mx.controls.Alert;
 			import workers.BackgroundWorker;
 			
 			public static var current:Main;
@@ -45,7 +50,7 @@
 			
 			private var file:File = new File();
 			
-			private var progressTitleWindow:ProgressTitleWindow = new ProgressTitleWindow();
+			private var progressTitleWindow:ProgressTitleWindow;
 			
 			//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 			//  Worker
@@ -75,6 +80,11 @@
 				bWorker.start();
 			}
 			
+			private function removeProgressTitleWindow(event:CloseEvent = null):void
+			{
+				PopUpManager.removePopUp(progressTitleWindow);
+			}
+			
 			/**
 			 * 修复 NumericStepper 在 value 为整数时以小数显示的问题。
 			 * 但是它虽然显示小数，也不会影响到 OSUPrinter，它打印出的还是整数。
@@ -82,9 +92,7 @@
 			protected function stepper_formatFunc(value:Number):String
 			{
 				const intager:uint = uint(value);
-				return value == intager ?
-					intager.toString() :
-					value.toString();
+				return value == intager ? intager.toString() : value.toString();
 			}
 			
 			// TODO: 把选择编码UI补上。还有去BMS2OSUConverter里把+1K的判断搞下，再来这补UI。
@@ -99,10 +107,15 @@
 			
 			protected function applicationCompleteHandler(event:FlexEvent):void
 			{
+				//loaderInfo.uncaughtErrorEvents.addEventListener(UncaughtErrorEvent.UNCAUGHT_ERROR, onUncaughtError);
+				
 				current = this;
 				file.addEventListener(Event.CANCEL, file_cancelHandler);
-				
-				createBackgroundWorker();
+			}
+			
+			private function onUncaughtError(event:UncaughtErrorEvent):void 
+			{
+				trace( "Main.onUncaughtError > event : " + event );
 			}
 			
 			//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
@@ -115,6 +128,8 @@
 					return;
 				
 				const msg:String = b2mChannel.receive(true);
+				
+				trace( "msg : " + msg );
 				
 				if (msg in this)
 				{
@@ -129,7 +144,7 @@
 					case BackgroundWorker.HEAD_BMSPACK_PROGRESS:
 						progressTitleWindow.setBMSPackProgress.apply(null, b2mChannel.receive(true));
 						break;
-					
+						
 					default:
 						throw new Error('未知的消息：' + msg);
 				}
@@ -138,6 +153,19 @@
 			//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 			//  Meassage
 			//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
+			
+			public function ready():void 
+			{
+				currentState = 'converting';
+				
+				progressTitleWindow = new ProgressTitleWindow();
+				
+				PopUpManager.addPopUp(progressTitleWindow, this, true);
+				PopUpManager.centerPopUp(progressTitleWindow);
+
+				m2bChannel.send(BackgroundWorker.HEAD_START);
+				m2bChannel.send(config);
+			}
 			
 			public function collecting():void
 			{
@@ -155,27 +183,37 @@
 			// TODO: Custom namespace?
 			public function not_found():void
 			{
-				Alert.show('然而你选的 BMS 文件夹中并没有找到 BMS', 'あれ？', Alert.OK, null, ok);
-				
-				function ok():void
-				{
-					PopUpManager.removePopUp(progressTitleWindow);
-				}
+				Alert.show('然而你选的 BMS 文件夹中并没有找到 BMS', 'あれ？', Alert.OK, null, removeProgressTitleWindow);
+			}
+			
+			registerClassAlias('Error', Error);
+			registerClassAlias('errors.BMSWarn', BMSWarn);
+			registerClassAlias('errors.BMSError', BMSError);
+			public function error():void 
+			{
+				const error:Object = b2mChannel.receive(true);
+				Alert.show(error.message, '新版不幸的事故', Alert.OK);
+				trace(error.stackTrace);
+			}
+			
+			registerClassAlias("Event", Event);
+			public function error_event():void 
+			{
+				const event:Event = b2mChannel.receive(true) as Event;
+				trace(event);
+				Alert.show(event.toString(), '不幸的事故', Alert.OK);
+				throw event;
 			}
 			
 			public function cancel():void
 			{
-				PopUpManager.removePopUp(progressTitleWindow);
+				bWorker.terminate();
+				removeProgressTitleWindow();
 			}
 			
 			public function complete():void
 			{
-				Alert.show('BMS 已经全部转换完毕！', 'やっっったぁぁぁぁぁ！', Alert.OK, null, ok);
-				
-				function ok():void
-				{
-					PopUpManager.removePopUp(progressTitleWindow);
-				}
+				Alert.show('BMS 已经全部转换完毕！', 'やっっったぁぁぁぁぁ！', Alert.OK, null, removeProgressTitleWindow);
 			}
 			
 			//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
@@ -218,23 +256,46 @@
 			protected function convertBtn_clickHandler(event:MouseEvent):void
 			{
 				const res:Array = Validator.validateAll(validators);
-				if (res.length != 0)
+				if (res.length != 0) return;
+				
+				try 
+				{
+					const bmsDirStr:File = new File(config.bmsDirStr);
+					if (!bmsDirStr.exists)
+					{
+						Alert.show('BMS 文件夹不存在啊', 'あれ？', Alert.OK, null, removeProgressTitleWindow);
+						return;
+					}
+				}
+				catch (error:ArgumentError)
+				{
+					Alert.show('别乱输 BMS 文件夹路径啊', 'あれ？', Alert.OK, null, removeProgressTitleWindow);
 					return;
+				}
 				
-				currentState = 'converting';
+				try 
+				{
+					const outputDirStr:File = new File(config.outputDirStr);
+					if (!bmsDirStr.exists)
+					{
+						Alert.show('输出文件夹不存在啊', 'あれ？', Alert.OK, null, removeProgressTitleWindow);
+						return;
+					}
+				}
+				catch (error:ArgumentError)
+				{
+					Alert.show('别乱输输出文件夹路径啊', 'あれ？', Alert.OK, null, removeProgressTitleWindow);
+					return;
+				}
 				
-				PopUpManager.addPopUp(progressTitleWindow, this, true);
-				PopUpManager.centerPopUp(progressTitleWindow);
-				
-				m2bChannel.send(BackgroundWorker.HEAD_START);
-				m2bChannel.send(config);
+				createBackgroundWorker();
 			}
 			
 		]]>
 	</fx:Script>
 	
 	<fx:Declarations>
-		<models:Config id="config"/>
+		<models:Config id="config" bmsDirStr="file:///D:/test_bms/[Silent Spica (a_hisa)] Anhedonia" outputDirStr="file:///D:/佳宸/Desktop" />
 		
 		<s:ArrayList id="encodings">
 			<fx:String>shift_jis</fx:String>

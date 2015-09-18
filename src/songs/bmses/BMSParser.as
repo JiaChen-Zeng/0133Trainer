@@ -1,6 +1,10 @@
 package songs.bmses
 {
+	import errors.BMSWarn;
 	import flash.filesystem.File;
+	import errors.BMSError;
+	import moe.aoi.utils.Chain;
+	import workers.BackgroundWorker;
 	
 	import songs.osus.BMS2OSUConverter;
 
@@ -37,6 +41,8 @@ package songs.bmses
 		
 		private var bms:BMS;
 		
+		private var chain:Chain;
+		
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		//
 		//  Methods
@@ -47,22 +53,34 @@ package songs.bmses
 		{
 			bms.init();
 			
-			for each (var line:String in bms.lines) 
-			{
-				parseLine(line);
-			}
+			chain = new Chain(Vector.<*>(bms.lines));
+			chain.func = parseLine;
+			chain.fail = BackgroundWorker.current.sendError;
+			chain.done = sortMainData;
+			chain.start();
+			//for each (var line:String in bms.lines) 
+			//{
+				//parseLine(line);
+			//}
 			
-			sortMainData();
+			//sortMainData();
 		}
 		
 		private function parseLine(line:String):void
 		{
 			if (RE_HEADER.test(line))
+			{
 				parseHeader.apply(null, RE_HEADER.exec(line).slice(1));
+			}
 			else if (RE_ID.test(line))
+			{
 				parseId.apply(null, RE_ID.exec(line).slice(1));
+			}
 			else if (RE_MAIN_DATA.test(line))
+			{
 				parseMainData.apply(null, RE_MAIN_DATA.exec(line).slice(1));
+			}
+			// 空行……什么的，就算了
 		}
 		
 		private function parseHeader(key:String, value:String):void
@@ -72,7 +90,7 @@ package songs.bmses
 				// 按属性的类型来赋值。
 				const attr:String = key.toLowerCase();
 				
-				if (attr == 'difficalty') // 辣鸡谱师连英文都会拼错，我真是服了！
+				if (attr == 'difficalty') // 辣鸡谱师连英文都会拼错，是在下输了！
 				{
 					bms.difficulty = parseInt(value);
 					trace('this[' + key.toLowerCase()+ '] = ' + value + ';');
@@ -87,26 +105,31 @@ package songs.bmses
 				
 //				trace(typeof bms[attr]);
 				
-				if (bms[attr] is uint
-					||  bms[attr] is int)
+				if (bms[attr] is uint || bms[attr] is int)
+				{
 					bms[attr] = parseInt(value);
+				}
 				else if (bms[attr] is Number)
+				{
 					bms[attr] = parseFloat(value);
+				}
 				else
 				{
-					if (attr == 'stagefile'
-					||  attr == 'banner'
-					||  attr == 'backbmp')
+					if (attr == 'stagefile' ||  attr == 'banner' ||  attr == 'backbmp')
+					{
 						bms[attr] = fixBmp(value);
+					}
 					else
+					{
 						bms[attr] = value;
+					}
 				}
 			} 
 			catch(error:Error) 
 			{
 				// TODO: 忽略|取消。
 				// 模糊匹配写错了的属性。
-				throw error;
+				throw new BMSError(BMSError.HEADER_ERROR + '未知的属性 ' + attr, error);
 			}
 			
 			trace('this[' + key.toLowerCase()+ '] = ' + value + ';');
@@ -114,10 +137,14 @@ package songs.bmses
 		
 		private function parseId(type:String, key:String, value:String):void
 		{
-			if (type === BMS.TYPE_WAV)
+			if (type == BMS.TYPE_WAV)
+			{
 				value = fixWav(value);
-			else if (type === BMS.TYPE_BMP)
+			}
+			else if (type == BMS.TYPE_BMP)
+			{
 				value = fixBmp(value);
+			}
 				
 			bms[type.toLowerCase() + 's'][parseInt(key, 36)] = value;
 		}
@@ -129,7 +156,7 @@ package songs.bmses
 			var data:Data;
 			
 			// 节拍通道直接是小数。
-			if (channel === BMS.CHANNEL_METER)
+			if (channel == BMS.CHANNEL_METER)
 			{
 				data = new Data();
 				data.measureIndex = measureIndex;
@@ -148,17 +175,20 @@ package songs.bmses
 			for (var i:int = 0; i < contentArr_length; i++) 
 			{
 				var contentStr:String = contentArr[i];
-				if (contentStr === '00') // 没有数据。
-					continue;
+				if (contentStr == '00') continue; // 没有数据
 				
 				data = new Data();
 				data.measureIndex = measureIndex;
 				data.channel = channel;
 				
-				if (channel == BMS.CHANNEL_BPM) // BPM 通道是16进制。
+				if (channel == BMS.CHANNEL_BPM) // BPM 通道是16进制
+				{
 					data.content = parseInt(contentStr, 16);
+				}
 				else
+				{
 					data.content = parseInt(contentStr, 36);
+				}
 				
 				data.index = i;
 				data.length = contentArr_length;
@@ -236,6 +266,7 @@ package songs.bmses
 		 */
 		private function fixWav(fileName:String):String
 		{
+			const originalFileName:String = fileName;
 			const dir:File = bms.bmsPack.directory;
 			
 			var file:File = dir.resolvePath(BMS2OSUConverter.matchPath(fileName));
@@ -252,12 +283,11 @@ package songs.bmses
 			fileName = fileName.replace(re, '.wav');
 			file = dir.resolvePath(BMS2OSUConverter.matchPath(fileName));
 			
-			if (file.exists)
-				return fileName;
+			if (file.exists) return fileName;
 			else
 			{
-				// TODO: 提示。
-				trace('捉鸡');
+				//trace(BMSWarn.RESOURCE_WARN + originalFileName);
+				throw new BMSWarn(BMSWarn.RESOURCE_WARN + originalFileName);
 			}
 			
 			return fileName;
@@ -265,6 +295,7 @@ package songs.bmses
 		
 		private function fixBmp(fileName:String):String
 		{
+			const originalFileName:String = fileName;
 			const dir:File = bms.bmsPack.directory;
 			
 			var file:File = dir.resolvePath(BMS2OSUConverter.matchPath(fileName));
@@ -315,12 +346,10 @@ package songs.bmses
 			fileName = fileName.replace(re, '.avi');
 			file = dir.resolvePath(BMS2OSUConverter.matchPath(fileName));
 			
-			if (file.exists)
-				return fileName;
+			if (file.exists) return fileName;
 			else
 			{
-				// TODO: 提示。
-				trace('捉鸡');
+				throw new BMSWarn(BMSWarn.RESOURCE_WARN + originalFileName);
 			}
 			
 			return fileName;

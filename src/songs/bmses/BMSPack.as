@@ -1,18 +1,16 @@
 package songs.bmses
 {
+	import events.BMSEvent;
+	import flash.events.ErrorEvent;
 	import flash.events.Event;
 	import flash.events.EventDispatcher;
 	import flash.events.FileListEvent;
 	import flash.events.IOErrorEvent;
 	import flash.filesystem.File;
-	
-	import mx.utils.StringUtil;
-	
-	import events.BMSEvent;
-	
 	import models.Config;
-	
 	import moe.aoi.utils.FileReferenceUtil;
+	import mx.utils.StringUtil;
+	import errors.BMSError;
 
 	//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 	//  Events
@@ -20,6 +18,7 @@ package songs.bmses
 	
 	[Event(name="complete", type="flash.events.Event")]
 	[Event(name="ioError", type="flash.events.IOErrorEvent")]
+	[Event(name="error", type="flash.events.ErrorEvent")]
 	[Event(name="collecting", type="events.BMSEvent")]
 	[Event(name="collected", type="events.BMSEvent")]
 	[Event(name="loading", type="events.BMSEvent")]
@@ -61,6 +60,8 @@ package songs.bmses
 		
 		private var config:Config;
 		
+		private var currentIndex:uint;
+		
 		private var total:uint;
 		
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
@@ -93,10 +94,6 @@ package songs.bmses
 		
 		public function get completedFiles():Vector.<File> { return _parsedFiles; }
 		
-		private var _failedEvents:Vector.<IOErrorEvent>;
-		
-		public function get failedEvents():Vector.<IOErrorEvent> { return _failedEvents; }
-		
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		//
 		//  Methods
@@ -105,113 +102,160 @@ package songs.bmses
 		
 		/**
 		 * 初始化，收集所有在 BMSPack 文件夹根目录的 bms 文件。
+		 * 事件：BMSEvent.COLLECTING BMSEvent.COLLECTED ErrorEvent.Error 
 		 */
 		public function collectAll():void
 		{
-			_bmses 				= new <BMS>[];
-			_collectedFiles		= new <File>[];
-			_loadedFiles		= new <File>[];
-			_parsedFiles		= new <File>[];
-			_failedEvents		= new <IOErrorEvent>[];
+			_bmses 			= new <BMS>[];
+			_collectedFiles	= new <File>[];
 			
 			_directory.addEventListener(FileListEvent.DIRECTORY_LISTING, collect);
+			_directory.addEventListener(IOErrorEvent.IO_ERROR, error);
 			_directory.getDirectoryListingAsync();
 			
 			function collect(event:FileListEvent):void
 			{
-				dispatchEvent(new BMSEvent(BMSEvent.COLLECTING, null, _collectedFiles.length));
+				_directory.removeEventListener(FileListEvent.DIRECTORY_LISTING, collect);
+				_directory.removeEventListener(IOErrorEvent.IO_ERROR, error);
 				
 				const files:Array = event.files;
+				
+				dispatchEvent(new BMSEvent(BMSEvent.COLLECTING, null, _collectedFiles.length));
+				
 				for each (var file:File in files) 
 				{
 					if (!BMS.isBMS(file))
 						continue;
 					
-					trace("BMSPack.directory_directoryListingHandler(event) : ",
-						file.name);
+					trace("BMSPack.directory_directoryListingHandler(event) : ", file.name);
 					_collectedFiles.push(file);
 					
 					dispatchEvent(new BMSEvent(BMSEvent.COLLECTING, file.name, _collectedFiles.length));
 				}
 				
-				total = _collectedFiles.length;
-				dispatchEvent(new BMSEvent(BMSEvent.COLLECTED, null, _collectedFiles.length, total));
+				dispatchEvent(new BMSEvent(BMSEvent.COLLECTED, null, _collectedFiles.length, _collectedFiles.length));
+			}
+			
+			function error(event:IOErrorEvent):void 
+			{
+				_directory.removeEventListener(FileListEvent.DIRECTORY_LISTING, collect);
+				_directory.removeEventListener(IOErrorEvent.IO_ERROR, error);
+
+				dispatchEvent(event);
 			}
 		}
 		
 		/**
 		 * 加载所有收集到的 BMS。
+		 * 事件：BMSEvent.LOADING BMSEvent.LOADING BMSEvent.LOADED IOErrorEvent.IO_ERROR
 		 */
 		public function loadAll():void
 		{
-			dispatchEvent(new BMSEvent(BMSEvent.LOADING, null, _loadedFiles.length, total));
+			trace( "BMSPack.loadAll" );
+			_loadedFiles = new <File>[];
 			
-			const len:uint = _collectedFiles.length;
-			for (var i:int = 0; i < len; i++) 
+			addEventListeners();
+			
+			currentIndex = 0;
+			
+			dispatchEvent(new BMSEvent(BMSEvent.LOADING, _collectedFiles[currentIndex].name, currentIndex, _collectedFiles.length));
+			
+			load();
+			
+			function load():void 
 			{
-				var file:File = _collectedFiles[i];
-				
-				file.addEventListener(Event.COMPLETE, onComplete);
-				file.addEventListener(IOErrorEvent.IO_ERROR, onIoError);
-				file.load();
+				_collectedFiles[currentIndex].load();
 			}
 			
 			function onComplete(event:Event):void
 			{
-				const file:File = event.currentTarget as File;
-				file.removeEventListener(Event.COMPLETE, arguments.callee);
+				trace( "BMSPack.onComplete > event : " + event );
+				const file:File = _collectedFiles[currentIndex];
+				
+				file.removeEventListener(Event.COMPLETE, onComplete);
+				file.removeEventListener(IOErrorEvent.IO_ERROR, onIoError);
 				
 				_loadedFiles.push(file);
 				
-				// TODO: 不管成功失败，都完成了，然后再触发 loaded。
-				if (_loadedFiles.length == total)
-					dispatchEvent(new BMSEvent(BMSEvent.LOADED, null,
-						_loadedFiles.length, total));
+				if (currentIndex == _collectedFiles.length - 1) // 可以忽略文件，不用 length
+				{
+					// 这里显示的是最后一个文件
+					dispatchEvent(new BMSEvent(BMSEvent.LOADED, null, currentIndex, _collectedFiles.length));
+				}
 				else
-					dispatchEvent(new BMSEvent(BMSEvent.LOADING, file.name,
-						_loadedFiles.length, total));
+				{
+					currentIndex++; // 这里显示的是下一个文件
+					dispatchEvent(new BMSEvent(BMSEvent.LOADING, _collectedFiles[currentIndex].name, currentIndex, _collectedFiles.length));
+					load();
+				}
+				
+			}
+			
+			function onIoError(event:IOErrorEvent):void
+			{
+				dispatchEvent(event);
+			}
+			
+			function addEventListeners():void 
+			{
+				for each (var file:File in _collectedFiles) 
+				{
+					file.addEventListener(Event.COMPLETE, onComplete);
+					file.addEventListener(IOErrorEvent.IO_ERROR, onIoError);
+				}
 			}
 		}
 		
 		/**
-		 * 解析 bms，这儿开始就是同步的了，可能会卡 UI。
+		 * 解析 bms，这儿开始就是同步的了。
+		 * 事件：BMSEvent.PARSING BMSEvent.PARSED
 		 */
 		public function parseAll():void
 		{
-			dispatchEvent(new BMSEvent(BMSEvent.PARSING, null, _parsedFiles.length, _loadedFiles.length));
+			_parsedFiles = new <File>[];
+
+			currentIndex = 0;
 			
-			for each (var file:File in _loadedFiles) // 如果有没 load 成功的，重试/忽略。
+			dispatchEvent(new BMSEvent(BMSEvent.PARSING, _loadedFiles[currentIndex].name, _parsedFiles.length, _loadedFiles.length));
+			
+			parse.call(this);
+			
+			function parse():void
 			{
-				parse(file);
+				const file:File = _loadedFiles[currentIndex];
+				
+				const bms:BMS = new BMS(this);
+				bms.name = FileReferenceUtil.getBaseName(file);
+				bms.extension = file.extension;
+				bms.setData(file.data, config.encoding);
+				bms.parse();
+				
+				_bmses.push(bms);
+				_parsedFiles.push(file);
+				
+	//			trace('loadComplete');
+				
+				// TODO: 如果忽略触发 ignored 事件，前进一个进度
+				if (currentIndex == _loadedFiles.length - 1) // 不比较两个 length，因为可以忽略文件
+				{
+					try 
+					{
+						matchName();
+					}
+					catch (error:Error)
+					{
+						throw new BMSError(BMSError.MATCHNAME_ERROR, error);
+					}
+					
+					dispatchEvent(new BMSEvent(BMSEvent.PARSED, null, currentIndex, _loadedFiles.length));
+				}
+				else 
+				{
+					currentIndex++;
+					dispatchEvent(new BMSEvent(BMSEvent.PARSING, _loadedFiles[currentIndex].name, currentIndex, _loadedFiles.length));
+					parse.call(this);
+				}
 			}
-		}
-		
-		private function parse(file:File):void
-		{
-			const bms:BMS = new BMS(this);
-			bms.name = FileReferenceUtil.getBaseName(file);
-			bms.extension = file.extension;
-			bms.setData(file.data, config.encoding);
-			bms.parse();
-			_bmses.push(bms);
-//			trace('loadComplete');
-			
-			_parsedFiles.push(file);
-			if (_parsedFiles.length == _loadedFiles.length)
-			{
-				matchName();
-				dispatchEvent(new BMSEvent(BMSEvent.PARSED, null, _parsedFiles.length, _loadedFiles.length));
-			}
-			
-			dispatchEvent(new BMSEvent(BMSEvent.PARSING, file.name, _parsedFiles.length, _loadedFiles.length));
-		}
-		
-		
-		private function onIoError(event:IOErrorEvent):void
-		{
-			_failedEvents.push(event); // 这个是干吗用的？
-			
-			dispatchEvent(event);
 		}
 		
 		/**
@@ -221,94 +265,94 @@ package songs.bmses
 		{
 			// TODO: 根据匹配出的难度名猜测是否为难度名。
 			// 模糊匹配关键字 {n}key、light、nomal、hard、hyper、another 等等。
-			try
+			//try
+			//{
+			// ==========取得全部标题。==========
+			var longTitles:Vector.<String> = new <String>[];
+			for each (var bms:BMS in bmses) 
 			{
-				// ==========取得全部标题。==========
-				var longTitles:Vector.<String> = new <String>[];
-				for each (var bms:BMS in bmses) 
-				{
-					longTitles.push(bms.title);
-				}
-				var length:uint = longTitles.length;
-				
-				// ==========判断是否有谱没难度名。==========
-				// 因为如果没有难度名，取最后框上的难度名的话可能会误取到歌名里的框。
-				// 假设有难度名。
-				var allHaveVersion:Boolean = true;
-				var versions:Vector.<String> = new <String>[];
-				var titles:Vector.<String> = new <String>[];
-				for each (var longTitle:String in longTitles) 
-				{
-					var version:String = RE_VERSION.exec(longTitle);
-					
-					titles.push(StringUtil.trim(longTitle.replace(version, '')));
-					versions.push(version);
-				}
-				
-				// ==========这里不是完全确定，还有可能是取到了歌名里的框。==========
-				// 计算出每个谱是正确歌名的概率。
-				var probability:Vector.<Number> = new <Number>[];
-				for (var i:int = 0; i < length; i++) 
-				{
-					probability[i] = 0;
-					for (var j:int = 0; j < length; j++) 
-					{
-						// 自己和别人比较，自己和自己就算了。
-						if (i === j)
-							continue;
-						
-						if (titles[i] === titles[j])
-							probability[i]++;
-					}
-					
-					// TODO: 如果就自己一个呢？貌似问题是没有的。
-					probability[i] /= length - 1; // 得减去自己。
-				}
-				
-				// ==========如果取到的歌名都是一样的（100%），那么就是它了。==========
-				for (var i3:int = 0; i3 < length; i3++) 
-				{
-					if (probability[i3] === 1.00)
-					{
-						_name = titles[0];
-						return;
-					}
-				}
-				
-				// ==========没那么幸运，取跟最多谱子一样的标题。==========
-				var maxProbability:Number;
-				var maxProbabilityIndex:uint;
-				for (var k:int = 0; k < length; k++) 
-				{
-					for (var i4:int = k + 1; i4 < length; i4++) 
-					{
-						var p1:Number = probability[k];
-						var p2:Number = probability[i4];
-						
-						if (p1 > p2)
-						{
-							maxProbability = p1;
-							maxProbabilityIndex = k;
-						}
-						else
-						{
-							maxProbability = p2;
-							maxProbabilityIndex = i4;
-						}
-					}
-				}
-				
-				// 很多（70%以上）歌名都不一样，那么应该是混合歌包。
-				if (maxProbability < 70)
-					_name = titles[maxProbabilityIndex];
-			} 
-			catch(error:Error) 
-			{
-//				throw error;
-				trace('匹配难度名出现错误，可能出现了乱码：' + bmses[0].title);
+				longTitles.push(bms.title);
 			}
+			var length:uint = longTitles.length;
+			
+			// ==========判断是否有谱没难度名。==========
+			// 因为如果没有难度名，取最后框上的难度名的话可能会误取到歌名里的框。
+			// 假设有难度名。
+			var allHaveVersion:Boolean = true;
+			var versions:Vector.<String> = new <String>[];
+			var titles:Vector.<String> = new <String>[];
+			for each (var longTitle:String in longTitles) 
+			{
+				var version:String = RE_VERSION.exec(longTitle);
+				
+				titles.push(StringUtil.trim(longTitle.replace(version, '')));
+				versions.push(version);
+			}
+			
+			// ==========这里不是完全确定，还有可能是取到了歌名里的框。==========
+			// 计算出每个谱是正确歌名的概率。
+			var probability:Vector.<Number> = new <Number>[];
+			for (var i:int = 0; i < length; i++) 
+			{
+				probability[i] = 0;
+				for (var j:int = 0; j < length; j++) 
+				{
+					// 自己和别人比较，自己和自己就算了。
+					if (i === j)
+						continue;
+					
+					if (titles[i] === titles[j])
+						probability[i]++;
+				}
+				
+				// TODO: 如果就自己一个呢？貌似问题是没有的。
+				probability[i] /= length - 1; // 得减去自己。
+			}
+			
+			// ==========如果取到的歌名都是一样的（100%），那么就是它了。==========
+			for (var i3:int = 0; i3 < length; i3++) 
+			{
+				if (probability[i3] === 1.00)
+				{
+					_name = titles[0];
+					return;
+				}
+			}
+			
+			// ==========没那么幸运，取跟最多谱子一样的标题。==========
+			var maxProbability:Number;
+			var maxProbabilityIndex:uint;
+			for (var k:int = 0; k < length; k++) 
+			{
+				for (var i4:int = k + 1; i4 < length; i4++) 
+				{
+					var p1:Number = probability[k];
+					var p2:Number = probability[i4];
+					
+					if (p1 > p2)
+					{
+						maxProbability = p1;
+						maxProbabilityIndex = k;
+					}
+					else
+					{
+						maxProbability = p2;
+						maxProbabilityIndex = i4;
+					}
+				}
+			}
+			
+			// 很多（70%以上）歌名都不一样，那么应该是混合歌包。
+			if (maxProbability < 70)
+			{
+				_name = titles[maxProbabilityIndex];
+			}
+			//catch(error:Error) 
+			//{
+////				throw error;
+				//trace('匹配难度名出现错误，可能出现了乱码：' + bmses[0].title);
+			//}
 		}
 	}
 }
-
 
