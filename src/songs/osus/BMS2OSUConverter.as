@@ -104,7 +104,9 @@ package songs.osus
 		{
 			path = path.replace('\\', '/');
 			if (path.charAt() === '/')
+			{
 				path.substring(1);
+			}
 			
 			return path;
 		}
@@ -221,13 +223,11 @@ package songs.osus
 			// TODO: 不要在这里做 if 判断，直接在 .convertBMS() 接收 iBMS，在内部判断。
 			if (iBMS is BMS)
 			{
-				trace('iBMS is BMS');
 				convertBMS(iBMS as BMS);
 				beatmap.addOSU(osu);
 			}
 			else if (iBMS is BMSPack)
 			{
-				trace('iBMS is BMSPack');
 				const bmsPack:BMSPack = iBMS as BMSPack;
 				for each (var bms:BMS in bmsPack.bmses) 
 				{

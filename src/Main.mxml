@@ -16,39 +16,33 @@
 	
 	<fx:Style source="css/Main.css"/>
 	
-	<!---
-		BMS 转换流程
-		1. 收集各个 BMSPack。
-		2. 加载各个 BMSPack。
-		3. 其中，收集各个 BMS。
-		4. 加载各个 BMS，并关联 wav 和 bmp。
-		5. 整理 BMSPack 里关联的 wav 和 bmp。
-		6. 转换各个 BMS。
-		7. 复制各个 wav 和 bmp。
-	-->
 	<fx:Script>
 		<![CDATA[
 			import components.ProgressTitleWindow;
 			import errors.BMSError;
-			import errors.BMSWarn;
+			import errors.BMSError;
+			import flash.display.Loader;
 			import flash.events.Event;
 			import flash.events.UncaughtErrorEvent;
+			import flash.filesystem.File;
 			import flash.net.registerClassAlias;
+			import flash.net.URLLoader;
+			import flash.net.URLLoaderDataFormat;
+			import flash.net.URLRequest;
 			import flash.system.Worker;
+			import mx.controls.Alert;
 			import mx.events.CloseEvent;
 			import mx.events.FlexEvent;
 			import mx.managers.PopUpManager;
 			import mx.validators.Validator;
-			//import spark.components.Alert;
-			import mx.controls.Alert;
 			import workers.BackgroundWorker;
 			
 			public static var current:Main;
 			
-			[Embed(source="/../libs/workers/BackgroundWorker.swf", mimeType="application/octet-stream")]
-			private static const WORKER:Class;
+			//[Embed(source="/../libs/workers/BackgroundWorker.swf", mimeType="application/octet-stream")]
+			//private static const WORKER:Class;
 			
-			private var file:File = new File();
+			private const file:File = new File();
 			
 			private var progressTitleWindow:ProgressTitleWindow;
 			
@@ -61,13 +55,18 @@
 			private var m2bChannel:MessageChannel;
 			private var b2mChannel:MessageChannel;
 			
+			private const workerLoader:URLLoader = new URLLoader();
+			
+			private const workerRequest:URLRequest = new URLRequest(File.applicationDirectory.resolvePath('workers/BackgroundWorker.swf').url);
+			
 			registerClassAlias('flash.filesystem.File', File);
 			/**
 			 * @see BackgroundWorker#applicationDirectory
 			 */
-			private function createBackgroundWorker():void
+			private function createBackgroundWorker(event:Event):void
 			{
-				bWorker = WorkerDomain.current.createWorker(new WORKER(), true);
+				trace('createBGWroker~');
+				bWorker = WorkerDomain.current.createWorker(workerLoader.data, true);
 				
 				m2bChannel = Worker.current.createMessageChannel(bWorker);
 				b2mChannel = bWorker.createMessageChannel(Worker.current);
@@ -111,11 +110,8 @@
 				
 				current = this;
 				file.addEventListener(Event.CANCEL, file_cancelHandler);
-			}
-			
-			private function onUncaughtError(event:UncaughtErrorEvent):void 
-			{
-				trace( "Main.onUncaughtError > event : " + event );
+				workerLoader.dataFormat = URLLoaderDataFormat.BINARY;
+				workerLoader.addEventListener(Event.COMPLETE, createBackgroundWorker);
 			}
 			
 			//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
@@ -124,12 +120,11 @@
 			
 			private function onB2MChannelMessage(event:Event):void
 			{
-				if (!b2mChannel.messageAvailable)
-					return;
+				if (!b2mChannel.messageAvailable) return;
 				
 				const msg:String = b2mChannel.receive(true);
 				
-				trace( "msg : " + msg );
+				//trace( "msg : " + msg );
 				
 				if (msg in this)
 				{
@@ -186,13 +181,19 @@
 				Alert.show('然而你选的 BMS 文件夹中并没有找到 BMS', 'あれ？', Alert.OK, null, removeProgressTitleWindow);
 			}
 			
+			public function critical_error():void 
+			{
+				const error:Object = b2mChannel.receive(true);
+				Alert.show(error.message, '不幸的事故', Alert.OK, null, removeProgressTitleWindow);
+				bWorker.terminate();
+			}
+			
 			registerClassAlias('Error', Error);
-			registerClassAlias('errors.BMSWarn', BMSWarn);
 			registerClassAlias('errors.BMSError', BMSError);
 			public function error():void 
 			{
 				const error:Object = b2mChannel.receive(true);
-				Alert.show(error.message, '新版不幸的事故', Alert.OK);
+				progressTitleWindow.addLog('警告：' + error.message + '\n')
 				trace(error.stackTrace);
 			}
 			
@@ -201,8 +202,8 @@
 			{
 				const event:Event = b2mChannel.receive(true) as Event;
 				trace(event);
-				Alert.show(event.toString(), '不幸的事故', Alert.OK);
-				throw event;
+				Alert.show(event.toString(), '不幸的事故', Alert.OK, null, removeProgressTitleWindow);
+				bWorker.terminate();
 			}
 			
 			public function cancel():void
@@ -288,7 +289,8 @@
 					return;
 				}
 				
-				createBackgroundWorker();
+				workerLoader.load(workerRequest);
+				//createBackgroundWorker();
 			}
 			
 		]]>

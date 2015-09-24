@@ -1,7 +1,6 @@
 package workers 
 {
 	import errors.BMSError;
-	import errors.BMSWarn;
 	import events.BMSEvent;
 	import flash.display.Sprite;
 	import flash.events.ErrorEvent;
@@ -19,6 +18,16 @@ package workers
 	import songs.osus.Beatmap;
 	import songs.osus.BMS2OSUConverter;
 	
+	/**
+	 * BMS 转换流程
+	 * 1. 收集各个 BMSPack。
+	 * 2. 加载各个 BMSPack。
+	 * 3. 其中，收集各个 BMS。
+	 * 4. 加载各个 BMS，并关联 wav 和 bmp。
+	 * 5. 整理 BMSPack 里关联的 wav 和 bmp。
+	 * 6. 转换各个 BMS。
+	 * 7. 复制各个 wav 和 bmp。
+	 */
 	public final class BackgroundWorker extends Sprite
 	{
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
@@ -60,6 +69,9 @@ package workers
 		/** 向主 Worker 发送，bmspack 进度改变。 */
 		public static const HEAD_BMSPACK_PROGRESS:String = 'bmspack_progress';
 		
+		/** 向主 Worker 发送，致命错误，退出执行 */
+		public static const HEAD_CRITICAL_ERROR:String = 'critical_error';
+		
 		/** 向主 Worker 发送，处理错误 */
 		public static const HEAD_ERROR:String = 'error';
 		
@@ -98,8 +110,8 @@ package workers
 		private var m2bChannel:MessageChannel;
 		private var b2mChannel:MessageChannel;
 		
-		private var file:File = new File();
-		private var files:Vector.<File> = new <File>[];
+		private const file:File = new File();
+		private const files:Vector.<File> = new <File>[];
 		
 		private var processingBMSPackIndex:uint;
 		
@@ -116,12 +128,6 @@ package workers
 		registerClassAlias('flash.filesystem.File', File);
 		private function init():void
 		{
-			trace( "BackgroundWorker.init" );
-			// TODO: 处理全局错误
-			//loaderInfo.uncaughtErrorEvents.addEventListener(UncaughtErrorEvent.UNCAUGHT_ERROR, onUncaughtError);
-			
-			//throw new Error('只是一个测试，并没有什么特别的意义');
-			
 			const current:Worker = Worker.current;
 			
 			m2bChannel = current.getSharedProperty('m2bChannel');
@@ -152,6 +158,7 @@ package workers
 			catch (error:ArgumentError)
 			{
 				sendError(error);
+				return;
 			}
 			
 			walkDirectoryAsync(bmsDir, walk, error, nextPhase, false);
@@ -185,34 +192,43 @@ package workers
 				sendBMSPackProgress(bmsPacks[processingBMSPackIndex].directory.name, processingBMSPackIndex, bmsPacks.length);
 				
 				// 先全部加上事件
-				addEventListeners();
-				collectBMSes();
-				
-				function addEventListeners():void 
+				for each (var bmsPack:BMSPack in bmsPacks) 
 				{
-					for each (var bmsPack:BMSPack in bmsPacks) 
-					{
-						bmsPack.addEventListener(BMSEvent.COLLECTING, sendBMSProgress);
-						bmsPack.addEventListener(BMSEvent.COLLECTED, loadBMSPack);
-						bmsPack.addEventListener(IOErrorEvent.IO_ERROR, bmsPack_IoErrorHandler);
-					}
+					bmsPack.addEventListener(BMSEvent.COLLECTING, sendBMSProgress);
+					bmsPack.addEventListener(BMSEvent.COLLECTED, loadBMSPack);
+					bmsPack.addEventListener(IOErrorEvent.IO_ERROR, bmsPack_IoErrorHandler);
 				}
+				
+				collectBMSes();
 			}
 		}
 		
+		/**
+		 * 异步操作
+		 * 出错为严重错误
+		 */
 		protected function collectBMSes():void
 		{
 			const bmsPack:BMSPack = bmsPacks[processingBMSPackIndex];
-			bmsPack.collectAll();
+			
+			try 
+			{
+				bmsPack.collectAll();
+			}
+			catch (error:Error)
+			{
+				sendError(new BMSError('在收集过程中发生严重错误', error, bmsPack.directory));
+				nextBMSPack();
+			}
 		}
 		
 		/**
-		 * 等到 bmsPack 收集完毕了，就一个一个开始转换。
+		 * 异步操作
+		 * 等到 bmsPack 收集完毕了，就一个一个开始转换
+		 * 出错为严重错误
 		 */
 		protected function loadBMSPack(event:BMSEvent):void
 		{
-			trace("Main.loadBMSPack()");
-			
 			const bmsPack:BMSPack = bmsPacks[processingBMSPackIndex];
 			
 			bmsPack.removeEventListener(BMSEvent.COLLECTING, sendBMSProgress);
@@ -222,9 +238,22 @@ package workers
 			bmsPack.addEventListener(BMSEvent.LOADING, sendBMSProgress);
 			bmsPack.addEventListener(BMSEvent.LOADED, parseBMSPack);
 			
-			bmsPack.loadAll();
+			try 
+			{
+				bmsPack.loadAll();
+			}
+			catch (error:Error)
+			{
+				sendError(new BMSError('在加载过程中发生严重错误', error, bmsPack.directory));
+				nextBMSPack();
+			}
 		}
 		
+		/**
+		 * 同步操作
+		 * 这里出错的话真是未知错误，会导致退出执行……
+		 * @param	event
+		 */
 		protected function parseBMSPack(event:BMSEvent):void
 		{
 			trace("Main.parseBMSPack(event)");
@@ -236,7 +265,15 @@ package workers
 			bmsPack.addEventListener(BMSEvent.PARSING, sendBMSProgress);
 			bmsPack.addEventListener(BMSEvent.PARSED, convertBMSPack);
 			
-			bmsPack.parseAll();
+			try 
+			{
+				bmsPack.parseAll();
+			}
+			catch (error:Error)
+			{
+				sendError(new BMSError('解析全部 BMS 过程中出现了未知错误，不幸地退出。不是我的错，是 Flash 太坑爹！', error, bmsPack.directory));
+				nextBMSPack();
+			}
 		}
 		
 		/**
@@ -244,8 +281,6 @@ package workers
 		 */
 		protected function convertBMSPack(event:BMSEvent):void
 		{
-			trace("Main.convertBMSPack(event)");
-			
 			const bmsPack:BMSPack = event.currentTarget as BMSPack;
 			
 			bmsPack.removeEventListener(BMSEvent.PARSING, sendBMSProgress);
@@ -253,10 +288,28 @@ package workers
 			
 			// 转换。
 			const converter:BMS2OSUConverter = new BMS2OSUConverter(config, bmsPack);
-			const beatmap:Beatmap = converter.convert();
+			try 
+			{
+				const beatmap:Beatmap = converter.convert();
+			}
+			catch (error:Error)
+			{
+				sendError(new BMSError('转换' + beatmap.name + '时出现致命错误，呜呜', error, bmsPack.directory));
+				next();
+				return;
+			}
 			
 			trySend(HEAD_ARRANGING);
-			beatmap.collectResources(); // 此处是同步的，要在卡之前更新一次视图。
+			try 
+			{
+				beatmap.collectResources(); // 此处是同步的，要在卡之前更新一次视图。
+			}
+			catch (error:Error)
+			{
+				sendError(new BMSError('在' + beatmap.name + '收集资源时出现致命错误', error, bmsPack.directory));
+				next();
+				return;
+			}
 			
 			
 			// 设置输出文件夹。
@@ -267,11 +320,12 @@ package workers
 			catch (error:ArgumentError)
 			{
 				sendError(error);
+				next();
+				return;
 			}
 			
 			// 根据当前正在处理的 bmsPack 索引判断是应该继续处理下一个还是处理完成了。
-			const listener:Function = processingBMSPackIndex == bmsPacks.length - 1 ?
-				complete : nextBMSPack;
+			const listener:Function = processingBMSPackIndex == bmsPacks.length - 1 ? complete : next;
 			
 			beatmap.addEventListener(BMSEvent.COPYING_OSU, sendBMSProgress);
 			beatmap.addEventListener(BMSEvent.COPYING_WAV, sendBMSProgress);
@@ -281,16 +335,22 @@ package workers
 			beatmap.addEventListener(ErrorEvent.ERROR, onError);
 			
 			// 保存到输出文件夹。
-			beatmap.saveAsync(outputDir);
+			try 
+			{
+				beatmap.saveAsync(outputDir);
+			} 
+			catch (error:Error) 
+			{
+				sendError(new BMSError('在保存' + beatmap.name + '时出现致命错误', error, bmsPack.directory));
+				next();
+				return;
+			}
 			
-			function nextBMSPack(event:Event):void
+			function next(event:Event = null):void
 			{
 				removeEventListeners();
 				
-				processingBMSPackIndex++;
-				sendBMSPackProgress(bmsPacks[processingBMSPackIndex - 1].directory.name, processingBMSPackIndex, bmsPacks.length);
-				
-				collectBMSes();
+				nextBMSPack();
 			}
 			
 			function complete(event:Event):void
@@ -326,6 +386,15 @@ package workers
 			}
 		}
 		
+		
+		public function nextBMSPack():void
+		{
+			processingBMSPackIndex++;
+			sendBMSPackProgress(bmsPacks[processingBMSPackIndex - 1].directory.name, processingBMSPackIndex, bmsPacks.length);
+			
+			collectBMSes()
+		}
+		
 		protected function bmsPack_IoErrorHandler(event:IOErrorEvent):void
 		{
 			sendErrorEvent(event);
@@ -340,7 +409,8 @@ package workers
 		 * @param completeFunc 完成遍历后的函数 function():void
 		 * @param isRootOnly 是否只遍历根目录
 		 */
-		public static function walkDirectoryAsync(directory:File, walkFunc:Function,
+		public static function walkDirectoryAsync(directory:File,
+												  walkFunc:Function,
 												  errorFunc:Function,
 												  completeFunc:Function,
 												  isRootOnly:Boolean = false):void
@@ -425,13 +495,22 @@ package workers
 		}
 		
 		registerClassAlias('Error', Error);
-		registerClassAlias('errors.BMSWarn', BMSWarn);
 		registerClassAlias('errors.BMSError', BMSError);
 		public function sendError(error:Error):void 
 		{
 			trace( "BackgroundWorker.sendError > error : " + error );
-			trySend(HEAD_ERROR);
-			trySend({message: error.message, stackTrace: error.getStackTrace()});
+			if (error is BMSError) 
+			{
+				const bmsError:BMSError = error as BMSError;
+				trySend(HEAD_ERROR);
+				trySend({message: error.message, stackTrace: error.getStackTrace(), file: bmsError.file});
+			}
+			else 
+			{
+				trySend(HEAD_CRITICAL_ERROR);
+				trySend({message: error.message, stackTrace: error.getStackTrace()});
+			}
+			
 		}
 		
 		registerClassAlias('Event', Event);
@@ -449,17 +528,20 @@ package workers
 		public function start():void 
 		{
 			config = m2bChannel.receive(true);
-			collectBMSPacks();
+			
+			try 
+			{
+				collectBMSPacks();
+			}
+			catch (error:Error)
+			{
+				sendError(error);
+			}
 		}
 		
 		public function cancel():void 
 		{
-			
-		}
-		
-		public function igore():void 
-		{
-			
+			Worker.current.terminate();
 		}
 		
 		public function retry():void 

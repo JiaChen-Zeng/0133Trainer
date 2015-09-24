@@ -27,13 +27,7 @@ package moe.aoi.utils
 		/**
 		 * 要对数据源做的操作函数，会传入对象
 		 */
-		public var func:Function;
-		
-		// TODO: 其实这个可以用 done(function(){}) 代替，又涉及包管理的问题，还是看看不用这个吧
-		/**
-		 * 在对象身上调用方法
-		 */
-		public var method:String;
+		public var funcs:Vector.<Function>;
 		
 		/**
 		 * 完成时调用的函数
@@ -87,6 +81,13 @@ package moe.aoi.utils
 		public function get length():uint { return _length; }
 		
 		/**
+		 * 函数的索引
+		 */
+		protected var _funcIndex:uint;
+		
+		public function get funcIndex():uint { return _funcIndex; }
+		
+		/**
 		 * 要处理，或正在处理的对象
 		 */
 		public function get object():* { return _source[_index]; }
@@ -101,6 +102,7 @@ package moe.aoi.utils
 		{
 			// 预设
 			_index = 0;
+			_funcIndex = 0;
 			
 			// 初始化 list 为跟 source 一样内容
 			_list = new Vector.<*>();
@@ -113,11 +115,11 @@ package moe.aoi.utils
 			_errorList = new Vector.<*>();
 		}
 		
-		protected function execute():void 
+		protected function execute(funcIndex:uint):void 
 		{
 			try 
 			{
-				func(object);
+				funcs[funcIndex](object);
 			}
 			catch (error:*)
 			{
@@ -145,6 +147,7 @@ package moe.aoi.utils
 		 */
 		public function error():void 
 		{
+			_funcIndex = 0; // 让对此对象的函数操作结束，不再对出错的对象进行处理
 			_list.splice(index, 1);
 			_errorList.push(_source.slice(index, index + 1)[0]);
 		}

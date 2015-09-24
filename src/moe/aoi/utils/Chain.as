@@ -41,11 +41,16 @@ package moe.aoi.utils
 			
 			while (_index < _length) 
 			{
-				execute();
+				while (_funcIndex < funcs.length) 
+				{
+					execute(_funcIndex);
+					
+					_funcIndex++;
+					
+					if (paused) return;
+				}
 				
 				_index++;
-				
-				if (paused) return;
 			}
 			
 			done();

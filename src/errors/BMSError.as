@@ -1,5 +1,6 @@
 package errors 
 {
+	import flash.filesystem.File;
 	/**
 	 * 关于 BMS 的各种错误
 	 * @author 彩月葵☆彡
@@ -12,11 +13,13 @@ package errors
 		//
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		
-		public static const HEADER_ERROR:String = '解析 BMS 头时出现错误：'
+		public static const RESOURCE_WARN:String = '找不到 BMS 资源文件：';
 		
-		public static const PARSE_ERROR:String = '解析 BMS 谱面时出现错误：';
+		public static const HEADER_WARN:String = '解析 BMS 头时出现错误：'
 		
-		public static const MATCHNAME_ERROR:String = '在尝试匹配出 BMS 曲包名字时出现错误：';
+		public static const PARSE_WARN:String = '解析 BMS 谱面时出现错误：';
+		
+		public static const MATCHNAME_WARN:String = '在尝试匹配出 BMS 曲包名字时出现错误：';
 		
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		//
@@ -24,10 +27,11 @@ package errors
 		//
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		
-		public function BMSError(message:String, error:Error) 
+		public function BMSError(message:String, error:Error, file:File) 
 		{
 			this.message = message;
 			_error = error;
+			_file = file;
 		}
 		
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
@@ -42,6 +46,10 @@ package errors
 		private var _error:Error;
 		
 		public function get error():Error { return _error; }
+		
+		private var _file:File;
+		
+		public function get file():File { return _file; }
 	}
 
 }

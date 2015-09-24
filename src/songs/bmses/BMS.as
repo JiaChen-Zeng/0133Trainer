@@ -102,9 +102,10 @@ package songs.bmses
 		//
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		
-		public function BMS(bmsPack:BMSPack = null)
+		public function BMS(bmsPack:BMSPack = null, file:File = null)
 		{
-			this._bmsPack = bmsPack;
+			_bmsPack = bmsPack;
+			_file = file;
 		}
 		
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
@@ -219,6 +220,10 @@ package songs.bmses
 		private var _bmsPack:BMSPack;
 		
 		public function get bmsPack():BMSPack { return _bmsPack; }
+		
+		private var _file:File;
+		
+		public function get file():File { return _file; }
 		
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		//

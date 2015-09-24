@@ -1,7 +1,7 @@
 package songs.bmses
 {
+	import errors.BMSError;
 	import events.BMSEvent;
-	import flash.events.ErrorEvent;
 	import flash.events.Event;
 	import flash.events.EventDispatcher;
 	import flash.events.FileListEvent;
@@ -10,7 +10,7 @@ package songs.bmses
 	import models.Config;
 	import moe.aoi.utils.FileReferenceUtil;
 	import mx.utils.StringUtil;
-	import errors.BMSError;
+	import workers.BackgroundWorker;
 
 	//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 	//  Events
@@ -102,7 +102,7 @@ package songs.bmses
 		
 		/**
 		 * 初始化，收集所有在 BMSPack 文件夹根目录的 bms 文件。
-		 * 事件：BMSEvent.COLLECTING BMSEvent.COLLECTED ErrorEvent.Error 
+		 * 事件：BMSEvent.COLLECTING BMSEvent.COLLECTED IOErrorEvent.IO_ERROR 
 		 */
 		public function collectAll():void
 		{
@@ -154,7 +154,11 @@ package songs.bmses
 			trace( "BMSPack.loadAll" );
 			_loadedFiles = new <File>[];
 			
-			addEventListeners();
+			for each (var file:File in _collectedFiles) 
+			{
+				file.addEventListener(Event.COMPLETE, onComplete);
+				file.addEventListener(IOErrorEvent.IO_ERROR, onIoError);
+			}
 			
 			currentIndex = 0;
 			
@@ -195,15 +199,6 @@ package songs.bmses
 			{
 				dispatchEvent(event);
 			}
-			
-			function addEventListeners():void 
-			{
-				for each (var file:File in _collectedFiles) 
-				{
-					file.addEventListener(Event.COMPLETE, onComplete);
-					file.addEventListener(IOErrorEvent.IO_ERROR, onIoError);
-				}
-			}
 		}
 		
 		/**
@@ -224,11 +219,19 @@ package songs.bmses
 			{
 				const file:File = _loadedFiles[currentIndex];
 				
-				const bms:BMS = new BMS(this);
+				const bms:BMS = new BMS(this, file);
 				bms.name = FileReferenceUtil.getBaseName(file);
 				bms.extension = file.extension;
 				bms.setData(file.data, config.encoding);
-				bms.parse();
+				try 
+				{
+					bms.parse();
+				}
+				catch (error:Error)
+				{
+					// TODO: 放入
+					BackgroundWorker.current.sendError(new BMSError('解析' + bms.name + '时出现未知错误，放入 failed 文件夹', error, bms.file));
+				}
 				
 				_bmses.push(bms);
 				_parsedFiles.push(file);
@@ -244,7 +247,7 @@ package songs.bmses
 					}
 					catch (error:Error)
 					{
-						throw new BMSError(BMSError.MATCHNAME_ERROR, error);
+						BackgroundWorker.current.sendError(new BMSError(BMSError.MATCHNAME_WARN, error, bms.file));
 					}
 					
 					dispatchEvent(new BMSEvent(BMSEvent.PARSED, null, currentIndex, _loadedFiles.length));
@@ -265,8 +268,6 @@ package songs.bmses
 		{
 			// TODO: 根据匹配出的难度名猜测是否为难度名。
 			// 模糊匹配关键字 {n}key、light、nomal、hard、hyper、another 等等。
-			//try
-			//{
 			// ==========取得全部标题。==========
 			var longTitles:Vector.<String> = new <String>[];
 			for each (var bms:BMS in bmses) 
@@ -347,11 +348,6 @@ package songs.bmses
 			{
 				_name = titles[maxProbabilityIndex];
 			}
-			//catch(error:Error) 
-			//{
-////				throw error;
-				//trace('匹配难度名出现错误，可能出现了乱码：' + bmses[0].title);
-			//}
 		}
 	}
 }

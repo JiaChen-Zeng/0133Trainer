@@ -1,6 +1,7 @@
 package songs.osus
 {
 	import assets.FFMPEG;
+	import errors.BMSError;
 	import events.BMSEvent;
 	import flash.events.ErrorEvent;
 	import flash.events.Event;
@@ -86,27 +87,37 @@ package songs.osus
 				for each (var wav:String in bms_wavs) 
 				{
 					if (wavs.indexOf(wav) == -1)
+					{
 						wavs.push(wav);
+					}
 				}
 				
 				var bms_bmps:Array = bms.bmps;
 				for each (var bmp:String in bms_bmps) 
 				{
 					if (bmps.indexOf(bmp) == -1)
+					{
 						bmps.push(bmp);
+					}
 				}
 				
 				var stagefile:String = bms.stagefile;
 				if (stagefile && bmps.indexOf(stagefile) == -1)
+				{
 					bmps.push(stagefile);
+				}
 				
 				var banner:String = bms.banner;
 				if (banner && bmps.indexOf(banner) == -1)
+				{
 					bmps.push(banner);
+				}
 				
 				var backbmp:String = bms.backbmp;
 				if (backbmp && bmps.indexOf(backbmp) == -1)
+				{
 					bmps.push(backbmp);
+				}
 			}
 		}
 		
@@ -114,6 +125,7 @@ package songs.osus
 		public function saveAsync(outputDir:File):void
 		{
 			outputDirectory = outputDir;
+			// 不复制了
 //			bmsPack = osues[0].bms.bmsPack;
 //			const ba:ByteArray = new ByteArray();
 //			ba.writeObject(bmsPack.directory);
@@ -140,24 +152,24 @@ package songs.osus
 				fs.close();
 				
 				// TODO: 确认是否覆盖。
-				const dst:File = outputDirectory.resolvePath(name + '/'
-					+ FileReferenceUtil.filterName(osu.name, ' ') + '.osu');
-				const nextFunc:Function = index == osues.length - 1 ?
-					nextPhase : nextOSU;
+				const dst:File = outputDirectory.resolvePath(name + '/' + FileReferenceUtil.filterName(osu.name, ' ') + '.osu');
+				const nextFunc:Function = index == osues.length - 1 ? nextPhase : nextOSU;
 				
 				tempFile.addEventListener(Event.COMPLETE, nextFunc);
 				tempFile.addEventListener(IOErrorEvent.IO_ERROR, OnIoError)
 				tempFile.copyToAsync(dst, true);
 				
 				if (index == 0) // 第一个复制的文件名这样才会显示出来。
+				{
 					dispatchEvent(new BMSEvent(BMSEvent.COPYING_OSU, dst.name, index, osues.length));
+				}
 				
 				trace('copy:', FileReferenceUtil.filterName(osu.name, ' ') + '.osu');
 			} 
 			catch(error:Error) 
 			{
 				// TODO: 提示。
-				throw error;
+				BackgroundWorker.current.sendError(new BMSError('保存文件' + name + '时出现错误', error, bmsPack.directory));
 			}
 			
 			function nextOSU(event:Event):void

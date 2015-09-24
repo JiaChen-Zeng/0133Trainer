@@ -1,12 +1,11 @@
 package songs.bmses
 {
-	import errors.BMSWarn;
-	import flash.filesystem.File;
 	import errors.BMSError;
+	import errors.BMSError;
+	import flash.filesystem.File;
 	import moe.aoi.utils.Chain;
-	import workers.BackgroundWorker;
-	
 	import songs.osus.BMS2OSUConverter;
+	import workers.BackgroundWorker;
 
 	public class BMSParser
 	{
@@ -41,8 +40,6 @@ package songs.bmses
 		
 		private var bms:BMS;
 		
-		private var chain:Chain;
-		
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		//
 		//  Methods
@@ -53,17 +50,18 @@ package songs.bmses
 		{
 			bms.init();
 			
-			chain = new Chain(Vector.<*>(bms.lines));
-			chain.func = parseLine;
-			chain.fail = BackgroundWorker.current.sendError;
-			chain.done = sortMainData;
-			chain.start();
-			//for each (var line:String in bms.lines) 
-			//{
-				//parseLine(line);
-			//}
+			//var chain:Chain = new Chain(Vector.<*>(bms.lines));
+			//chain.func = parseLine;
+			//chain.fail = BackgroundWorker.current.sendWarn;
+			//chain.done = sortMainData;
+			//chain.start();
 			
-			//sortMainData();
+			for each (var line:String in bms.lines) 
+			{
+				parseLine(line);
+			}
+			
+			sortMainData();
 		}
 		
 		private function parseLine(line:String):void
@@ -129,7 +127,7 @@ package songs.bmses
 			{
 				// TODO: 忽略|取消。
 				// 模糊匹配写错了的属性。
-				throw new BMSError(BMSError.HEADER_ERROR + '未知的属性 ' + attr, error);
+				BackgroundWorker.current.sendError(new BMSError(BMSError.HEADER_WARN + '未知的属性 ' + attr, error, bms.file));
 			}
 			
 			trace('this[' + key.toLowerCase()+ '] = ' + value + ';');
@@ -270,15 +268,13 @@ package songs.bmses
 			const dir:File = bms.bmsPack.directory;
 			
 			var file:File = dir.resolvePath(BMS2OSUConverter.matchPath(fileName));
-			if (file.exists)
-				return fileName;
+			if (file.exists) return fileName;
 			
 			const re:RegExp = /\.(\w+)$/i;
 			fileName = fileName.replace(re, '.ogg');
 			file = dir.resolvePath(BMS2OSUConverter.matchPath(fileName));
 			
-			if (file.exists)
-				return fileName;
+			if (file.exists) return fileName;
 			
 			fileName = fileName.replace(re, '.wav');
 			file = dir.resolvePath(BMS2OSUConverter.matchPath(fileName));
@@ -286,8 +282,8 @@ package songs.bmses
 			if (file.exists) return fileName;
 			else
 			{
-				//trace(BMSWarn.RESOURCE_WARN + originalFileName);
-				throw new BMSWarn(BMSWarn.RESOURCE_WARN + originalFileName);
+				//trace(BMSError.RESOURCE_WARN + originalFileName);
+				BackgroundWorker.current.sendError(new BMSError(BMSError.RESOURCE_WARN + originalFileName, null, bms.file));
 			}
 			
 			return fileName;
@@ -299,8 +295,7 @@ package songs.bmses
 			const dir:File = bms.bmsPack.directory;
 			
 			var file:File = dir.resolvePath(BMS2OSUConverter.matchPath(fileName));
-			if (file.exists)
-				return fileName;
+			if (file.exists) return fileName;
 			
 			const re:RegExp = /\.(\w+)$/i;
 			
@@ -309,39 +304,33 @@ package songs.bmses
 			fileName = fileName.replace(re, '.png');
 			file = dir.resolvePath(BMS2OSUConverter.matchPath(fileName));
 			
-			if (file.exists)
-				return fileName;
+			if (file.exists) return fileName;
 			
 			fileName = fileName.replace(re, '.jpg');
 			file = dir.resolvePath(BMS2OSUConverter.matchPath(fileName));
 			
-			if (file.exists)
-				return fileName;
+			if (file.exists) return fileName;
 			
 			fileName = fileName.replace(re, '.jpeg');
 			file = dir.resolvePath(BMS2OSUConverter.matchPath(fileName));
 			
-			if (file.exists)
-				return fileName;
+			if (file.exists) return fileName;
 			
 			fileName = fileName.replace(re, '.bmp');
 			file = dir.resolvePath(BMS2OSUConverter.matchPath(fileName));
 			
-			if (file.exists)
-				return fileName;
+			if (file.exists) return fileName;
 			
 			// 视频：
 			fileName = fileName.replace(re, '.mpg');
 			file = dir.resolvePath(BMS2OSUConverter.matchPath(fileName));
 			
-			if (file.exists)
-				return fileName;
+			if (file.exists) return fileName;
 			
 			fileName = fileName.replace(re, '.mpeg');
 			file = dir.resolvePath(BMS2OSUConverter.matchPath(fileName));
 			
-			if (file.exists)
-				return fileName;
+			if (file.exists) return fileName;
 			
 			fileName = fileName.replace(re, '.avi');
 			file = dir.resolvePath(BMS2OSUConverter.matchPath(fileName));
@@ -349,7 +338,7 @@ package songs.bmses
 			if (file.exists) return fileName;
 			else
 			{
-				throw new BMSWarn(BMSWarn.RESOURCE_WARN + originalFileName);
+				BackgroundWorker.current.sendError(new BMSError(BMSError.RESOURCE_WARN + originalFileName, null, bms.file));
 			}
 			
 			return fileName;

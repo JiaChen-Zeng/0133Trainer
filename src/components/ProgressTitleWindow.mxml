@@ -12,6 +12,9 @@
 			import mx.managers.PopUpManager;
 			
 			[Bindable]
+			public var log:String = '';
+			
+			[Bindable]
 			private var bmsPack:String;
 			
 			[Bindable]
@@ -47,6 +50,13 @@
 				bmsProgressBar.setProgress(value, total);
 			}
 			
+			public function addLog(log:String):void 
+			{
+				const pos:uint = this.log.length - 1;
+				this.log += log;
+				logText.scrollToRange(pos);
+			}
+			
 		]]>
 	</fx:Script>
 	
@@ -80,6 +90,10 @@
 					label.copying_wav			= "{'复制 WAV: '		+ res}"
 					label.copying_bmp			= "{'复制 BMP: '		+ res}"
 					mode="manual"/>
+	
+	<s:TextArea id="logText" editable="false" text="@{log}"
+				typicalText="这个警告可能差不多会有这么长？还是太短了，再加一点字吧。"
+				height="100" />
 	
 </s:TitleWindow>
 

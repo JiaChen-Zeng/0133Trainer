@@ -5,7 +5,7 @@ package moe.aoi.utils
 	 * ...
 	 * @author 彩月葵☆彡
 	 */
-	public class ChainAsync extends ChainBase 
+	public class AsyncChain extends ChainBase 
 	{
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		//
@@ -13,7 +13,7 @@ package moe.aoi.utils
 		//
 		//☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆☆
 		
-		public function ChainAsync(source:Vector.<*>):void 
+		public function AsyncChain(source:Vector.<*>):void 
 		{
 			super(source);
 		}
